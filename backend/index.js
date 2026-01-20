@@ -59,7 +59,10 @@ const upload = multer({
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowedMimeTypes.includes(file.mimetype) && allowedExtensions.includes(ext)) {
+    if (
+      allowedMimeTypes.includes(file.mimetype) &&
+      allowedExtensions.includes(ext)
+    ) {
       cb(null, true);
     } else {
       cb(new Error("File type not allowed"), false);
@@ -71,22 +74,29 @@ const upload = multer({
    ROUTES
 ======================= */
 
-// metadata
+/* 📄 FILE METADATA */
 app.get("/meta/:filename", async (req, res) => {
   const file = await File.findOne({ filename: req.params.filename });
+
   if (!file) return res.status(404).json({ error: "File not found" });
-  if (file.expiresAt && file.expiresAt < new Date())
+
+  if (file.expiresAt && file.expiresAt < new Date()) {
     return res.status(410).json({ error: "Link expired" });
+  }
 
   res.json({
     originalName: file.originalName,
     size: file.size,
-    expiresAt: file.expiresAt
+    expiresAt: file.expiresAt,
+    maxDownloads: file.maxDownloads,
+    downloadsLeft:
+      file.maxDownloads === null
+        ? null
+        : file.maxDownloads - file.downloads
   });
 });
 
-// download
-// download
+/* ⬇ DOWNLOAD */
 app.get("/download/:filename", async (req, res) => {
   const file = await File.findOne({ filename: req.params.filename });
   if (!file) return res.status(404).send("File not found");
@@ -95,12 +105,12 @@ app.get("/download/:filename", async (req, res) => {
     return res.status(410).send("Link expired");
   }
 
-  // ❌ already downloaded
-  if (file.downloads >= file.maxDownloads) {
+  // 🔒 Max downloads check
+  if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
     return res.status(410).send("Link already used");
   }
 
-  // 🔒 password check
+  // 🔐 Password check
   if (file.password) {
     const pw = req.query.password;
     if (!pw) return res.status(401).send("Password required");
@@ -109,27 +119,27 @@ app.get("/download/:filename", async (req, res) => {
     if (!ok) return res.status(403).send("Incorrect password");
   }
 
-  // ✅ DEFINE FILE PATH (THIS WAS MISSING)
   const filePath = path.join(__dirname, "uploads", file.filename);
+
   if (!fs.existsSync(filePath)) {
-  await file.deleteOne();
-  return res.status(410).send("File no longer available");
-}
+    await file.deleteOne();
+    return res.status(410).send("File no longer available");
+  }
 
   res.download(filePath, file.originalName, async () => {
     file.downloads += 1;
     await file.save();
 
-    // 🧹 delete file after first download
-    fs.unlink(filePath, () => {
-      console.log("One-time file deleted:", file.filename);
-    });
+    // 🧹 Delete only when limit reached
+    if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
+      fs.unlink(filePath, () => {
+        console.log("File deleted after max downloads:", file.filename);
+      });
+    }
   });
 });
 
-
-
-// upload
+/* ⬆ UPLOAD */
 app.post("/upload", (req, res) => {
   upload.single("file")(req, res, async err => {
     if (err) return res.status(400).json({ error: err.message });
@@ -138,21 +148,27 @@ app.post("/upload", (req, res) => {
     const password = req.body.password || null;
     const expiry = req.body.expiry || "10m";
 
-    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+    // 🔢 max downloads
+    let maxDownloads = parseInt(req.body.maxDownloads || "1");
+    if (maxDownloads >= 9999) maxDownloads = null; // unlimited
+
+    const hashedPassword = password
+      ? await bcrypt.hash(password, 10)
+      : null;
+
     const expiresAt = EXPIRY_OPTIONS[expiry]
       ? new Date(Date.now() + EXPIRY_OPTIONS[expiry])
       : null;
 
     const file = new File({
-  originalName: req.file.originalname,
-  filename: req.file.filename,
-  size: req.file.size,
-  password: hashedPassword,
-  expiresAt,
-  maxDownloads: 1,   // ✅ one-time
-  downloads: 0
-});
-
+      originalName: req.file.originalname,
+      filename: req.file.filename,
+      size: req.file.size,
+      password: hashedPassword,
+      expiresAt,
+      maxDownloads,
+      downloads: 0
+    });
 
     await file.save();
 
@@ -160,13 +176,14 @@ app.post("/upload", (req, res) => {
       message: "File uploaded successfully",
       downloadLink: `https://hideshare.vercel.app/download/${file.filename}`,
       passwordProtected: !!password,
-      expiresAt
+      expiresAt,
+      maxDownloads
     });
   });
 });
 
 /* =======================
-   CLEANUP
+   CLEANUP JOB
 ======================= */
 setInterval(async () => {
   const now = new Date();
@@ -185,4 +202,6 @@ setInterval(async () => {
    SERVER
 ======================= */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Server running on ${PORT}`)
+);

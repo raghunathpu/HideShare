@@ -1,161 +1,151 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-
-function Download() {
-  const { filename } = useParams();
-  const navigate = useNavigate();
-
-  const [fileInfo, setFileInfo] = useState(null);
+const [maxDownloads, setMaxDownloads] = useState(1);
+import { useState, useEffect } from "react";
+function Upload() {
+  const [file, setFile] = useState(null);
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [expiry, setExpiry] = useState("10m");
+  const [uploadResult, setUploadResult] = useState(null);
+  const [status, setStatus] = useState("");
   const [now, setNow] = useState(Date.now());
 
-  /* ⏱ Tick every second */
+  // ⏱ Tick every second
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
     }, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
-  /* 📡 Fetch file metadata */
-  useEffect(() => {
-    fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) {
-          setError(data.error);
-        } else {
-          setFileInfo({
-            ...data,
-            expiresAt: data.expiresAt
-              ? new Date(data.expiresAt).getTime()
-              : null
-          });
-        }
-      })
-      .catch(() => setError("Failed to load file info"));
-  }, [filename]);
+  const handleUpload = async () => {
+    if (!file) {
+      setStatus("❌ Please select a file");
+      return;
+    }
 
-  /* ⏳ Countdown formatter */
-  const formatExpiry = () => {
-    if (!fileInfo?.expiresAt) return "Permanent";
+    setStatus("⏳ Uploading...");
 
-    const diff = fileInfo.expiresAt - now;
+    const formData = new FormData();
+    formData.append("file", file);
+    if (password) formData.append("password", password);
+    formData.append("expiry", expiry);
+
+    try {
+      const res = await fetch(
+        "https://hideshare-backend.onrender.com/upload",
+        { method: "POST", body: formData }
+      );
+
+      const data = await res.json();
+      setUploadResult(data);
+      setStatus("");
+    } catch {
+      setStatus("❌ Upload failed");
+    }
+  };
+
+  const copyLink = () => {
+    const filename = uploadResult.downloadLink.split("/").pop();
+    const frontendLink = `https://hideshare.vercel.app/download/${filename}`;
+    navigator.clipboard.writeText(frontendLink);
+    alert("Link copied");
+  };
+
+  // ⏳ Countdown formatter
+  const formatExpiry = (expiresAt) => {
+    if (!expiresAt) return "Permanent";
+
+    const diff = new Date(expiresAt).getTime() - now;
     if (diff <= 0) return "Expired";
 
     const mins = Math.floor(diff / 60000);
     const secs = Math.floor((diff % 60000) / 1000);
-
     return `${mins}m ${secs}s`;
   };
 
-  const expiryText = formatExpiry();
+  const expiryText = uploadResult
+    ? formatExpiry(uploadResult.expiresAt)
+    : "";
 
-
-  /* 🔁 Auto-redirect when expired */
+  // 🔄 Auto-reset after expiry
   useEffect(() => {
     if (expiryText === "Expired") {
-      const timer = setTimeout(() => {
-        navigate("/");
-      }, 5000); // redirect after 5 seconds
-
-      return () => clearTimeout(timer);
+      setTimeout(() => {
+        setUploadResult(null);
+        setFile(null);
+        setPassword("");
+        setExpiry("10m");
+      }, 2000);
     }
-  }, [expiryText, navigate]);
-
-  /* ⬇ Download handler */
-  const download = async () => {
-  let url = `https://hideshare-backend.onrender.com/download/${filename}`;
-
-  if (password) {
-    url += `?password=${encodeURIComponent(password)}`;
-  }
-
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-  const text = await res.text();
-  alert(text);
-
-  // 🔁 redirect back to upload after 3s
-  setTimeout(() => {
-    navigate("/");
-  }, 3000);
-
-  return;
-}
-
-
-    window.open(url, "_blank");
-  } catch {
-    alert("Download failed");
-  }
-};
-
-
-  /* ❌ Error state */
-  if (error) {
-    return (
-      <p style={{ color: "red", textAlign: "center" }}>
-        {error}
-      </p>
-    );
-  }
-
-  /* ⏳ Loading state */
-  if (!fileInfo) {
-    return <p style={{ textAlign: "center" }}>Loading...</p>;
-  }
+  }, [expiryText]);
 
   return (
     <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
-      <h2>Download File</h2>
+      <h2>HideShare</h2>
 
-      <p><strong>File:</strong> {fileInfo.originalName}</p>
-      <p><strong>Size:</strong> {(fileInfo.size / 1024).toFixed(2)} KB</p>
+      <div
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          setFile(e.dataTransfer.files[0]);
+        }}
+        style={{ border: "2px dashed #aaa", padding: "30px" }}
+      >
+        {file ? <p>{file.name}</p> : <p>Drag & drop file</p>}
+      </div>
 
-      <p>
-        ⏳ <strong>Expires in:</strong>{" "}
-        <span style={{ color: expiryText === "Expired" ? "red" : "black" }}>
-          {expiryText}
-        </span>
-      </p>
+      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+      <br /><br />
 
-      {/* 🔒 Password input (always safe to show) */}
       <input
         type="password"
-        placeholder="Enter password (if required)"
+        placeholder="Optional password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        style={{ width: "100%", padding: "8px" }}
       />
+      <br /><br />
+
+      <label>
+        <strong>Link expiry</strong>
+        <select
+          value={expiry}
+          onChange={(e) => setExpiry(e.target.value)}
+          style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+        >
+          <option value="10m">10 minutes</option>
+          <option value="20m">20 minutes</option>
+          <option value="30m">30 minutes</option>
+          <option value="1h">1 hour</option>
+          <option value="permanent">Permanent</option>
+        </select>
+      </label>
 
       <br /><br />
 
-      <button
-        onClick={download}
-        disabled={expiryText === "Expired"}
-        style={{
-          opacity: expiryText === "Expired" ? 0.5 : 1,
-          cursor: expiryText === "Expired" ? "not-allowed" : "pointer"
-        }}
-      >
-        Download
-      </button>
+      <button onClick={handleUpload}>Upload</button>
 
-      {expiryText === "Expired" && (
-        <p style={{ color: "red", marginTop: "10px" }}>
-          ❌ Link expired. Redirecting…
-        </p>
+      {status && <p>{status}</p>}
+
+      {uploadResult && (
+        <div style={{ marginTop: "20px" }}>
+          <p>✅ Upload successful</p>
+
+          <p>
+            ⏳ Expires in: <strong>{expiryText}</strong>
+          </p>
+
+          {uploadResult.passwordProtected && <p>🔒 Password protected</p>}
+
+          {expiryText === "Expired" ? (
+            <p style={{ color: "red", fontWeight: "bold" }}>
+              ❌ Link expired. Resetting…
+            </p>
+          ) : (
+            <button onClick={copyLink}>Copy Link</button>
+          )}
+        </div>
       )}
-      <p style={{ color: "orange" }}>
-  ⚠ This file can be downloaded only once
-</p>
-
     </div>
   );
 }
 
-export default Download;
+export default Upload;

@@ -4,15 +4,14 @@ function Upload() {
   const [file, setFile] = useState(null);
   const [password, setPassword] = useState("");
   const [expiry, setExpiry] = useState("10m");
+  const [maxDownloads, setMaxDownloads] = useState(1); // ✅ FIXED
   const [uploadResult, setUploadResult] = useState(null);
   const [status, setStatus] = useState("");
   const [now, setNow] = useState(Date.now());
 
-  // ⏱ Tick every second
+  /* ⏱ Tick every second */
   useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
+    const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -28,6 +27,7 @@ function Upload() {
     formData.append("file", file);
     if (password) formData.append("password", password);
     formData.append("expiry", expiry);
+    formData.append("maxDownloads", maxDownloads); // ✅ SEND TO BACKEND
 
     try {
       const res = await fetch(
@@ -50,7 +50,7 @@ function Upload() {
     alert("Link copied");
   };
 
-  // ⏳ Countdown formatter
+  /* ⏳ Countdown formatter */
   const formatExpiry = (expiresAt) => {
     if (!expiresAt) return "Permanent";
 
@@ -66,22 +66,11 @@ function Upload() {
     ? formatExpiry(uploadResult.expiresAt)
     : "";
 
-  // 🔄 Auto-reset after expiry
-  useEffect(() => {
-    if (expiryText === "Expired") {
-      setTimeout(() => {
-        setUploadResult(null);
-        setFile(null);
-        setPassword("");
-        setExpiry("10m");
-      }, 2000);
-    }
-  }, [expiryText]);
-
   return (
     <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
       <h2>HideShare</h2>
 
+      {/* Drag & Drop */}
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
@@ -104,6 +93,7 @@ function Upload() {
       />
       <br /><br />
 
+      {/* EXPIRY */}
       <label>
         <strong>Link expiry</strong>
         <select
@@ -121,6 +111,23 @@ function Upload() {
 
       <br /><br />
 
+      {/* DOWNLOAD LIMIT */}
+      <label>
+        <strong>Max downloads</strong>
+        <select
+          value={maxDownloads}
+          onChange={(e) => setMaxDownloads(Number(e.target.value))}
+          style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+        >
+          <option value={1}>1 time (recommended)</option>
+          <option value={2}>2 times</option>
+          <option value={5}>5 times</option>
+          <option value={9999}>Unlimited</option>
+        </select>
+      </label>
+
+      <br /><br />
+
       <button onClick={handleUpload}>Upload</button>
 
       {status && <p>{status}</p>}
@@ -129,15 +136,14 @@ function Upload() {
         <div style={{ marginTop: "20px" }}>
           <p>✅ Upload successful</p>
 
-          <p>
-            ⏳ Expires in: <strong>{expiryText}</strong>
-          </p>
+          <p>⏳ Expires in: <strong>{expiryText}</strong></p>
+          <p>⬇ Max downloads: <strong>{maxDownloads === 9999 ? "Unlimited" : maxDownloads}</strong></p>
 
           {uploadResult.passwordProtected && <p>🔒 Password protected</p>}
 
           {expiryText === "Expired" ? (
             <p style={{ color: "red", fontWeight: "bold" }}>
-              ❌ Link expired. Resetting…
+              ❌ Link expired
             </p>
           ) : (
             <button onClick={copyLink}>Copy Link</button>
