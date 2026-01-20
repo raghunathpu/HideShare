@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import QRCode from "qrcode.react";
 
 function Download() {
   const { filename } = useParams();
   const navigate = useNavigate();
+  const qrRef = useRef(null);
 
   const [fileInfo, setFileInfo] = useState(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [now, setNow] = useState(Date.now());
 
-  // ⏱ Tick every second
+  /* ⏱ Tick every second */
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
@@ -18,7 +20,7 @@ function Download() {
     return () => clearInterval(interval);
   }, []);
 
-  // 📡 Fetch metadata
+  /* 📡 Fetch metadata */
   useEffect(() => {
     fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
       .then(res => res.json())
@@ -37,7 +39,7 @@ function Download() {
       .catch(() => setError("Failed to load file info"));
   }, [filename]);
 
-  // ⏳ Countdown
+  /* ⏳ Countdown */
   const formatExpiry = () => {
     if (!fileInfo?.expiresAt) return "Permanent";
 
@@ -51,17 +53,25 @@ function Download() {
 
   const expiryText = formatExpiry();
 
-  // ⬇ Download
+  /* 🔁 Redirect after expiry */
+  useEffect(() => {
+    if (expiryText === "Expired") {
+      const t = setTimeout(() => navigate("/"), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [expiryText, navigate]);
+
+  /* ⬇ Download */
   const download = async () => {
     let url = `https://hideshare-backend.onrender.com/download/${filename}`;
-    if (password) {
-      url += `?password=${encodeURIComponent(password)}`;
-    }
+    if (password) url += `?password=${encodeURIComponent(password)}`;
 
     try {
       const res = await fetch(url);
       if (!res.ok) {
-        alert(await res.text());
+        const msg = await res.text();
+        alert(msg);
+        setTimeout(() => navigate("/"), 3000);
         return;
       }
       window.open(url, "_blank");
@@ -70,13 +80,27 @@ function Download() {
     }
   };
 
+  /* 📥 Download QR */
+  const downloadQR = () => {
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "HideShare-QR.png";
+    a.click();
+  };
+
   if (error) {
     return <p style={{ color: "red", textAlign: "center" }}>{error}</p>;
   }
 
   if (!fileInfo) {
-    return <p style={{ textAlign: "center" }}>Loading...</p>;
+    return <p style={{ textAlign: "center" }}>Loading…</p>;
   }
+
+  const frontendLink = `https://hideshare.vercel.app/download/${filename}`;
 
   return (
     <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
@@ -116,6 +140,28 @@ function Download() {
       <p style={{ color: "orange", marginTop: "10px" }}>
         ⚠ This file can be downloaded only once
       </p>
+
+      {/* 📱 QR CODE */}
+      {expiryText !== "Expired" && (
+        <div style={{ marginTop: "25px", textAlign: "center" }} ref={qrRef}>
+          <p>📱 Scan QR to download</p>
+          <QRCode
+            value={frontendLink}
+            size={180}
+            level="H"
+            includeMargin
+          />
+
+          <br /><br />
+          <button onClick={downloadQR}>Download QR</button>
+        </div>
+      )}
+
+      {expiryText === "Expired" && (
+        <p style={{ color: "red", marginTop: "10px" }}>
+          ❌ Link expired. Redirecting…
+        </p>
+      )}
     </div>
   );
 }

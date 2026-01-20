@@ -1,13 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import QRCode from "qrcode.react";
 
 function Upload() {
   const [file, setFile] = useState(null);
   const [password, setPassword] = useState("");
   const [expiry, setExpiry] = useState("10m");
-  const [maxDownloads, setMaxDownloads] = useState(1); // ✅ FIXED
+  const [maxDownloads, setMaxDownloads] = useState(1);
   const [uploadResult, setUploadResult] = useState(null);
   const [status, setStatus] = useState("");
   const [now, setNow] = useState(Date.now());
+
+  const qrRef = useRef(null); // ✅ QR reference
 
   /* ⏱ Tick every second */
   useEffect(() => {
@@ -27,7 +30,7 @@ function Upload() {
     formData.append("file", file);
     if (password) formData.append("password", password);
     formData.append("expiry", expiry);
-    formData.append("maxDownloads", maxDownloads); // ✅ SEND TO BACKEND
+    formData.append("maxDownloads", maxDownloads);
 
     try {
       const res = await fetch(
@@ -44,13 +47,20 @@ function Upload() {
   };
 
   const copyLink = () => {
-    const filename = uploadResult.downloadLink.split("/").pop();
-    const frontendLink = `https://hideshare.vercel.app/download/${filename}`;
-    navigator.clipboard.writeText(frontendLink);
+    navigator.clipboard.writeText(uploadResult.downloadLink);
     alert("Link copied");
   };
 
-  /* ⏳ Countdown formatter */
+  const downloadQR = () => {
+    const canvas = qrRef.current.querySelector("canvas");
+    const url = canvas.toDataURL("image/png");
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "HideShare-QR.png";
+    a.click();
+  };
+
   const formatExpiry = (expiresAt) => {
     if (!expiresAt) return "Permanent";
 
@@ -67,17 +77,16 @@ function Upload() {
     : "";
 
   return (
-    <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
+    <div style={{ maxWidth: 500, margin: "40px auto", fontFamily: "Arial" }}>
       <h2>HideShare</h2>
 
-      {/* Drag & Drop */}
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
           setFile(e.dataTransfer.files[0]);
         }}
-        style={{ border: "2px dashed #aaa", padding: "30px" }}
+        style={{ border: "2px dashed #aaa", padding: 30 }}
       >
         {file ? <p>{file.name}</p> : <p>Drag & drop file</p>}
       </div>
@@ -93,13 +102,12 @@ function Upload() {
       />
       <br /><br />
 
-      {/* EXPIRY */}
       <label>
         <strong>Link expiry</strong>
         <select
           value={expiry}
           onChange={(e) => setExpiry(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+          style={{ width: "100%", padding: 8 }}
         >
           <option value="10m">10 minutes</option>
           <option value="20m">20 minutes</option>
@@ -111,15 +119,14 @@ function Upload() {
 
       <br /><br />
 
-      {/* DOWNLOAD LIMIT */}
       <label>
         <strong>Max downloads</strong>
         <select
           value={maxDownloads}
           onChange={(e) => setMaxDownloads(Number(e.target.value))}
-          style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+          style={{ width: "100%", padding: 8 }}
         >
-          <option value={1}>1 time (recommended)</option>
+          <option value={1}>1 time</option>
           <option value={2}>2 times</option>
           <option value={5}>5 times</option>
           <option value={9999}>Unlimited</option>
@@ -129,25 +136,27 @@ function Upload() {
       <br /><br />
 
       <button onClick={handleUpload}>Upload</button>
-
       {status && <p>{status}</p>}
 
       {uploadResult && (
-        <div style={{ marginTop: "20px" }}>
+        <div style={{ marginTop: 25, textAlign: "center" }}>
           <p>✅ Upload successful</p>
-
           <p>⏳ Expires in: <strong>{expiryText}</strong></p>
-          <p>⬇ Max downloads: <strong>{maxDownloads === 9999 ? "Unlimited" : maxDownloads}</strong></p>
 
-          {uploadResult.passwordProtected && <p>🔒 Password protected</p>}
+          <button onClick={copyLink}>Copy Link</button>
 
-          {expiryText === "Expired" ? (
-            <p style={{ color: "red", fontWeight: "bold" }}>
-              ❌ Link expired
-            </p>
-          ) : (
-            <button onClick={copyLink}>Copy Link</button>
-          )}
+          <div ref={qrRef} style={{ marginTop: 20 }}>
+            <QRCode
+              value={uploadResult.downloadLink}
+              size={180}
+              level="H"
+              includeMargin
+            />
+          </div>
+
+          <button onClick={downloadQR} style={{ marginTop: 10 }}>
+            Download QR
+          </button>
         </div>
       )}
     </div>
