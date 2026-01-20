@@ -7,23 +7,22 @@ function Download() {
   const [fileInfo, setFileInfo] = useState(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [timeLeft, setTimeLeft] = useState("");
+  const [now, setNow] = useState(Date.now()); // 🔥 ticking state
 
-  // format countdown
-  const getRemainingTime = (expiresAt) => {
-  if (!expiresAt) return "Permanent";
+  // calculate remaining time
+  const getRemainingTime = (expiresAt, now) => {
+    if (!expiresAt) return "Permanent";
 
-  const diff = expiresAt - Date.now();
-  if (diff <= 0) return "Expired";
+    const diff = expiresAt - now;
+    if (diff <= 0) return "Expired";
 
-  const mins = Math.floor(diff / 60000);
-  const secs = Math.floor((diff % 60000) / 1000);
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
 
-  return `${mins}m ${secs}s`;
-};
+    return `${mins}m ${secs}s`;
+  };
 
-
-  // fetch file metadata
+  // fetch metadata once
   useEffect(() => {
     fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
       .then(res => res.json())
@@ -31,29 +30,25 @@ function Download() {
         if (data.error) {
           setError(data.error);
         } else {
-          const expiryTime = data.expiresAt ? new Date(data.expiresAt).getTime() : null;
-
-setFileInfo({
-  ...data,
-  expiresAt: expiryTime
-});
-setTimeLeft(getRemainingTime(expiryTime));
-
+          setFileInfo({
+            ...data,
+            expiresAt: data.expiresAt
+              ? new Date(data.expiresAt).getTime()
+              : null
+          });
         }
       })
       .catch(() => setError("Failed to load file info"));
   }, [filename]);
 
-  // countdown timer
+  // tick every second (FORCE RE-RENDER)
   useEffect(() => {
-  if (!fileInfo || !fileInfo.expiresAt) return;
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
 
-  const interval = setInterval(() => {
-    setTimeLeft(getRemainingTime(fileInfo.expiresAt));
-  }, 1000);
-
-  return () => clearInterval(interval);
-}, [fileInfo?.expiresAt]);
+    return () => clearInterval(interval);
+  }, []);
 
   const download = () => {
     let url = `https://hideshare-backend.onrender.com/download/${filename}`;
@@ -70,6 +65,8 @@ setTimeLeft(getRemainingTime(expiryTime));
   if (!fileInfo) {
     return <p>Loading...</p>;
   }
+
+  const timeLeft = getRemainingTime(fileInfo.expiresAt, now);
 
   return (
     <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
@@ -96,16 +93,15 @@ setTimeLeft(getRemainingTime(expiryTime));
       <br /><br />
 
       <button
-  onClick={download}
-  disabled={timeLeft === "Expired"}
-  style={{
-    opacity: timeLeft === "Expired" ? 0.5 : 1,
-    cursor: timeLeft === "Expired" ? "not-allowed" : "pointer"
-  }}
->
-  Download
-</button>
-
+        onClick={download}
+        disabled={timeLeft === "Expired"}
+        style={{
+          opacity: timeLeft === "Expired" ? 0.5 : 1,
+          cursor: timeLeft === "Expired" ? "not-allowed" : "pointer"
+        }}
+      >
+        Download
+      </button>
     </div>
   );
 }
