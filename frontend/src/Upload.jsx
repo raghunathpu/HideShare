@@ -40,6 +40,17 @@ function Upload() {
     navigator.clipboard.writeText(frontendLink);
     alert("Link copied");
   };
+  const formatExpiry = (expiresAt) => {
+  if (!expiresAt) return "Permanent";
+
+  const diff = new Date(expiresAt) - new Date();
+  if (diff <= 0) return "Expired";
+
+  const mins = Math.floor(diff / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+
+  return `${mins}m ${secs}s`;
+};
 
   return (
     <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
@@ -90,11 +101,22 @@ function Upload() {
       {status && <p>{status}</p>}
 
       {uploadResult && (
-        <>
-          <p>✅Upload successful</p>
-          <button onClick={copyLink}>Copy Link</button>
-        </>
-      )}
+  <div style={{ marginTop: "20px" }}>
+    <p>✅ Upload successful</p>
+
+    <p>
+      ⏳ Expires in:{" "}
+      <strong>{formatExpiry(uploadResult.expiresAt)}</strong>
+    </p>
+
+    {uploadResult.passwordProtected && (
+      <p>🔒 Password protected</p>
+    )}
+
+    <button onClick={copyLink}>Copy Link</button>
+  </div>
+)}
+
     </div>
   );
 }
