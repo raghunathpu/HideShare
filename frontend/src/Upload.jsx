@@ -28,7 +28,7 @@ function Upload() {
 
       const data = await res.json();
       setUploadResult(data);
-      setStatus("✅ Upload successful");
+      setStatus("");
     } catch {
       setStatus("❌ Upload failed");
     }
@@ -67,22 +67,31 @@ function Upload() {
       />
       <br /><br />
 
-      <select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
-        <option value="10m">10 minutes</option>
-        <option value="20m">20 minutes</option>
-        <option value="30m">30 minutes</option>
-        <option value="1h">1 hour</option>
-        <option value="permanent">Permanent</option>
-      </select>
+      <label style={{ display: "block", marginTop: "10px" }}>
+  <strong>Link expiry</strong>
+  <br />
+  <select
+    value={expiry}
+    onChange={(e) => setExpiry(e.target.value)}
+    style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+  >
+    <option value="10m">Expire in 10 minutes</option>
+    <option value="20m">Expire in 20 minutes</option>
+    <option value="30m">Expire in 30 minutes</option>
+    <option value="1h">Expire in 1 hour</option>
+    <option value="permanent">Permanent</option>
+  </select>
+</label>
 
-      <br /><br />
+<br />
+
       <button onClick={handleUpload}>Upload</button>
 
       {status && <p>{status}</p>}
 
       {uploadResult && (
         <>
-          <p>Upload successful</p>
+          <p>✅Upload successful</p>
           <button onClick={copyLink}>Copy Link</button>
         </>
       )}
