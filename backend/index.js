@@ -1,3 +1,11 @@
+const EXPIRY_OPTIONS = {
+  "10m": 10 * 60 * 1000,
+  "20m": 20 * 60 * 1000,
+  "30m": 30 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "permanent": null
+};
+
 const File = require("./models/File");
 
 const cors = require("cors");
@@ -98,6 +106,28 @@ app.use(express.json());
 /* =======================
    ROUTES
 ======================= */
+app.get("/file-info/:filename", async (req, res) => {
+  try {
+    const file = await File.findOne({ filename: req.params.filename });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    if (file.expiresAt && file.expiresAt < new Date()) {
+      return res.status(410).json({ error: "Link expired" });
+    }
+
+    res.json({
+      originalName: file.originalName,
+      size: file.size,
+      expiresAt: file.expiresAt
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch file info" });
+  }
+});
+
 app.get("/download/:filename", async (req, res) => {
   try {
     const file = await File.findOne({ filename: req.params.filename });
@@ -105,6 +135,9 @@ app.get("/download/:filename", async (req, res) => {
     if (!file) {
       return res.status(404).send("File expired or does not exist");
     }
+    if (file.expiresAt && file.expiresAt < new Date()) {
+  return res.status(410).send("Link expired");
+}
 
     // If file is password protected
     if (file.password) {
@@ -141,24 +174,32 @@ app.post("/upload", (req, res) => {
 
     try {
       const password = req.body.password || null;
-      let hashedPassword = null;
+const expiry = req.body.expiry || "10m";
 
-      if (password) {
-        hashedPassword = await bcrypt.hash(password, 10);
-      }
+let hashedPassword = null;
+if (password) {
+  hashedPassword = await bcrypt.hash(password, 10);
+}
 
-      const file = new File({
-        originalName: req.file.originalname,
-        filename: req.file.filename,
-        size: req.file.size,
-        password: hashedPassword
-      });
+let expiresAt = null;
+if (EXPIRY_OPTIONS[expiry]) {
+  expiresAt = new Date(Date.now() + EXPIRY_OPTIONS[expiry]);
+}
+
+const file = new File({
+  originalName: req.file.originalname,
+  filename: req.file.filename,
+  size: req.file.size,
+  password: hashedPassword,
+  expiresAt
+});
+
 
       await file.save();
 
       res.json({
         message: "File uploaded successfully",
-        downloadLink: `https://hide-share.vercel.app/download/${file.filename}`,
+        downloadLink: `https://hideshare.vercel.app/download/${file.filename}`,
         passwordProtected: password ? true : false,
         expiresIn: "10 minutes"
       });
