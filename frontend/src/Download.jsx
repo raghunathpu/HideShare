@@ -10,16 +10,18 @@ function Download() {
   const [timeLeft, setTimeLeft] = useState("");
 
   // format countdown
-  const formatTime = (expiresAt) => {
-    if (!expiresAt) return "Permanent";
+  const getRemainingTime = (expiresAt) => {
+  if (!expiresAt) return "Permanent";
 
-    const diff = new Date(expiresAt) - new Date();
-    if (diff <= 0) return "Expired";
+  const diff = expiresAt - Date.now();
+  if (diff <= 0) return "Expired";
 
-    const mins = Math.floor(diff / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    return `${mins}m ${secs}s`;
-  };
+  const mins = Math.floor(diff / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+
+  return `${mins}m ${secs}s`;
+};
+
 
   // fetch file metadata
   useEffect(() => {
@@ -29,8 +31,14 @@ function Download() {
         if (data.error) {
           setError(data.error);
         } else {
-          setFileInfo(data);
-          setTimeLeft(formatTime(data.expiresAt));
+          const expiryTime = data.expiresAt ? new Date(data.expiresAt).getTime() : null;
+
+setFileInfo({
+  ...data,
+  expiresAt: expiryTime
+});
+setTimeLeft(getRemainingTime(expiryTime));
+
         }
       })
       .catch(() => setError("Failed to load file info"));
@@ -38,14 +46,14 @@ function Download() {
 
   // countdown timer
   useEffect(() => {
-    if (!fileInfo || !fileInfo.expiresAt) return;
+  if (!fileInfo || !fileInfo.expiresAt) return;
 
-    const interval = setInterval(() => {
-      setTimeLeft(formatTime(fileInfo.expiresAt));
-    }, 1000);
+  const interval = setInterval(() => {
+    setTimeLeft(getRemainingTime(fileInfo.expiresAt));
+  }, 1000);
 
-    return () => clearInterval(interval);
-  }, [fileInfo]);
+  return () => clearInterval(interval);
+}, [fileInfo?.expiresAt]);
 
   const download = () => {
     let url = `https://hideshare-backend.onrender.com/download/${filename}`;
@@ -87,7 +95,17 @@ function Download() {
 
       <br /><br />
 
-      <button onClick={download}>Download</button>
+      <button
+  onClick={download}
+  disabled={timeLeft === "Expired"}
+  style={{
+    opacity: timeLeft === "Expired" ? 0.5 : 1,
+    cursor: timeLeft === "Expired" ? "not-allowed" : "pointer"
+  }}
+>
+  Download
+</button>
+
     </div>
   );
 }
