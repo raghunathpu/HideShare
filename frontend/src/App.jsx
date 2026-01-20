@@ -22,7 +22,7 @@ function App() {
     if (password) formData.append("password", password);
 
     try {
-      const res = await fetch("http://localhost:5000/upload", {
+      const res = await fetch("https://hideshare-backend.onrender.com/upload", {
         method: "POST",
         body: formData,
       });
