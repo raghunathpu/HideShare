@@ -86,21 +86,48 @@ app.get("/meta/:filename", async (req, res) => {
 });
 
 // download
+// download
 app.get("/download/:filename", async (req, res) => {
   const file = await File.findOne({ filename: req.params.filename });
   if (!file) return res.status(404).send("File not found");
-  if (file.expiresAt && file.expiresAt < new Date())
-    return res.status(410).send("Link expired");
 
+  if (file.expiresAt && file.expiresAt < new Date()) {
+    return res.status(410).send("Link expired");
+  }
+
+  // ❌ already downloaded
+  if (file.downloads >= file.maxDownloads) {
+    return res.status(410).send("Link already used");
+  }
+
+  // 🔒 password check
   if (file.password) {
     const pw = req.query.password;
     if (!pw) return res.status(401).send("Password required");
+
     const ok = await bcrypt.compare(pw, file.password);
     if (!ok) return res.status(403).send("Incorrect password");
   }
 
-  res.download(path.join(__dirname, "uploads", file.filename), file.originalName);
+  // ✅ DEFINE FILE PATH (THIS WAS MISSING)
+  const filePath = path.join(__dirname, "uploads", file.filename);
+  if (!fs.existsSync(filePath)) {
+  await file.deleteOne();
+  return res.status(410).send("File no longer available");
+}
+
+  res.download(filePath, file.originalName, async () => {
+    file.downloads += 1;
+    await file.save();
+
+    // 🧹 delete file after first download
+    fs.unlink(filePath, () => {
+      console.log("One-time file deleted:", file.filename);
+    });
+  });
 });
+
+
 
 // upload
 app.post("/upload", (req, res) => {
@@ -117,12 +144,15 @@ app.post("/upload", (req, res) => {
       : null;
 
     const file = new File({
-      originalName: req.file.originalname,
-      filename: req.file.filename,
-      size: req.file.size,
-      password: hashedPassword,
-      expiresAt
-    });
+  originalName: req.file.originalname,
+  filename: req.file.filename,
+  size: req.file.size,
+  password: hashedPassword,
+  expiresAt,
+  maxDownloads: 1,   // ✅ one-time
+  downloads: 0
+});
+
 
     await file.save();
 

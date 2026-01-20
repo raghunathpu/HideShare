@@ -6,14 +6,13 @@ function Upload() {
   const [expiry, setExpiry] = useState("10m");
   const [uploadResult, setUploadResult] = useState(null);
   const [status, setStatus] = useState("");
-  const [now, setNow] = useState(Date.now()); // ✅ NEW
+  const [now, setNow] = useState(Date.now());
 
-  // ✅ TICK EVERY SECOND
+  // ⏱ Tick every second
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
     }, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -51,7 +50,7 @@ function Upload() {
     alert("Link copied");
   };
 
-  // ✅ LIVE COUNTDOWN
+  // ⏳ Countdown formatter
   const formatExpiry = (expiresAt) => {
     if (!expiresAt) return "Permanent";
 
@@ -60,9 +59,24 @@ function Upload() {
 
     const mins = Math.floor(diff / 60000);
     const secs = Math.floor((diff % 60000) / 1000);
-
     return `${mins}m ${secs}s`;
   };
+
+  const expiryText = uploadResult
+    ? formatExpiry(uploadResult.expiresAt)
+    : "";
+
+  // 🔄 Auto-reset after expiry
+  useEffect(() => {
+    if (expiryText === "Expired") {
+      setTimeout(() => {
+        setUploadResult(null);
+        setFile(null);
+        setPassword("");
+        setExpiry("10m");
+      }, 2000);
+    }
+  }, [expiryText]);
 
   return (
     <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
@@ -97,10 +111,10 @@ function Upload() {
           onChange={(e) => setExpiry(e.target.value)}
           style={{ width: "100%", padding: "8px", marginTop: "5px" }}
         >
-          <option value="10m">Expire in 10 minutes</option>
-          <option value="20m">Expire in 20 minutes</option>
-          <option value="30m">Expire in 30 minutes</option>
-          <option value="1h">Expire in 1 hour</option>
+          <option value="10m">10 minutes</option>
+          <option value="20m">20 minutes</option>
+          <option value="30m">30 minutes</option>
+          <option value="1h">1 hour</option>
           <option value="permanent">Permanent</option>
         </select>
       </label>
@@ -116,15 +130,18 @@ function Upload() {
           <p>✅ Upload successful</p>
 
           <p>
-            ⏳ Expires in:{" "}
-            <strong>{formatExpiry(uploadResult.expiresAt)}</strong>
+            ⏳ Expires in: <strong>{expiryText}</strong>
           </p>
 
-          {uploadResult.passwordProtected && (
-            <p>🔒 Password protected</p>
-          )}
+          {uploadResult.passwordProtected && <p>🔒 Password protected</p>}
 
-          <button onClick={copyLink}>Copy Link</button>
+          {expiryText === "Expired" ? (
+            <p style={{ color: "red", fontWeight: "bold" }}>
+              ❌ Link expired. Resetting…
+            </p>
+          ) : (
+            <button onClick={copyLink}>Copy Link</button>
+          )}
         </div>
       )}
     </div>

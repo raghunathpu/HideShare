@@ -53,6 +53,7 @@ function Download() {
 
   const expiryText = formatExpiry();
 
+
   /* 🔁 Auto-redirect when expired */
   useEffect(() => {
     if (expiryText === "Expired") {
@@ -65,15 +66,34 @@ function Download() {
   }, [expiryText, navigate]);
 
   /* ⬇ Download handler */
-  const download = () => {
-    let url = `https://hideshare-backend.onrender.com/download/${filename}`;
+  const download = async () => {
+  let url = `https://hideshare-backend.onrender.com/download/${filename}`;
 
-    if (password) {
-      url += `?password=${encodeURIComponent(password)}`;
-    }
+  if (password) {
+    url += `?password=${encodeURIComponent(password)}`;
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+  const text = await res.text();
+  alert(text);
+
+  // 🔁 redirect back to upload after 3s
+  setTimeout(() => {
+    navigate("/");
+  }, 3000);
+
+  return;
+}
+
 
     window.open(url, "_blank");
-  };
+  } catch {
+    alert("Download failed");
+  }
+};
+
 
   /* ❌ Error state */
   if (error) {
@@ -130,6 +150,10 @@ function Download() {
           ❌ Link expired. Redirecting…
         </p>
       )}
+      <p style={{ color: "orange" }}>
+  ⚠ This file can be downloaded only once
+</p>
+
     </div>
   );
 }

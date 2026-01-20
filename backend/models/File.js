@@ -4,17 +4,18 @@ const fileSchema = new mongoose.Schema({
   originalName: String,
   filename: String,
   size: Number,
+  password: String,
+  expiresAt: Date,
 
-  password: {
-    type: String,
-    default: null
+  // ✅ NEW
+  maxDownloads: {
+    type: Number,
+    default: 1
   },
-
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    expires: 600 // 10 minutes
+  downloads: {
+    type: Number,
+    default: 0
   }
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model("File", fileSchema);
