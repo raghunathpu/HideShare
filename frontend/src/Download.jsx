@@ -4,40 +4,44 @@ import { useEffect, useState } from "react";
 function Download() {
   const { filename } = useParams();
 
+  const [fileInfo, setFileInfo] = useState(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [fileInfo, setFileInfo] = useState(null);
   const [timeLeft, setTimeLeft] = useState("");
 
-  // Fetch file metadata
+  // format countdown
+  const formatTime = (expiresAt) => {
+    if (!expiresAt) return "Permanent";
+
+    const diff = new Date(expiresAt) - new Date();
+    if (diff <= 0) return "Expired";
+
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return `${mins}m ${secs}s`;
+  };
+
+  // fetch file metadata
   useEffect(() => {
-    fetch(`https://hideshare-backend.onrender.com/file-info/${filename}`)
+    fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
       .then(res => res.json())
       .then(data => {
         if (data.error) {
           setError(data.error);
         } else {
           setFileInfo(data);
+          setTimeLeft(formatTime(data.expiresAt));
         }
       })
       .catch(() => setError("Failed to load file info"));
   }, [filename]);
 
-  // Countdown timer
+  // countdown timer
   useEffect(() => {
     if (!fileInfo || !fileInfo.expiresAt) return;
 
     const interval = setInterval(() => {
-      const diff = new Date(fileInfo.expiresAt) - new Date();
-
-      if (diff <= 0) {
-        setTimeLeft("Expired");
-        clearInterval(interval);
-      } else {
-        const minutes = Math.floor(diff / 60000);
-        const seconds = Math.floor((diff % 60000) / 1000);
-        setTimeLeft(`${minutes}m ${seconds}s`);
-      }
+      setTimeLeft(formatTime(fileInfo.expiresAt));
     }, 1000);
 
     return () => clearInterval(interval);
@@ -45,40 +49,40 @@ function Download() {
 
   const download = () => {
     let url = `https://hideshare-backend.onrender.com/download/${filename}`;
-
     if (password) {
       url += `?password=${encodeURIComponent(password)}`;
     }
-
     window.open(url, "_blank");
   };
 
   if (error) {
-    return <p style={{ color: "red", padding: "40px" }}>{error}</p>;
+    return <p style={{ color: "red" }}>{error}</p>;
   }
 
   if (!fileInfo) {
-    return <p style={{ padding: "40px" }}>Loading...</p>;
+    return <p>Loading...</p>;
   }
 
   return (
-    <div style={{ maxWidth: "400px", margin: "60px auto", fontFamily: "Arial" }}>
+    <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
       <h2>Download File</h2>
 
       <p><strong>File:</strong> {fileInfo.originalName}</p>
-      <p><strong>Size:</strong> {(fileInfo.size / 1024).toFixed(1)} KB</p>
+      <p><strong>Size:</strong> {(fileInfo.size / 1024).toFixed(2)} KB</p>
 
-      {fileInfo.expiresAt && (
-        <p><strong>Expires in:</strong> ⏳ {timeLeft}</p>
-      )}
-
-      <br />
+      <p>
+        ⏳ <strong>Expires in:</strong>{" "}
+        <span style={{ color: timeLeft === "Expired" ? "red" : "black" }}>
+          {timeLeft}
+        </span>
+      </p>
 
       <input
         type="password"
         placeholder="Enter password (if required)"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
+        style={{ width: "100%", padding: "8px" }}
       />
 
       <br /><br />
