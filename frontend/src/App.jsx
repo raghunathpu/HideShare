@@ -52,9 +52,20 @@ function App() {
   };
 
   const copyLink = () => {
-    navigator.clipboard.writeText(uploadResult.downloadLink);
-    alert("Link copied to clipboard");
-  };
+  if (!uploadResult || !uploadResult.downloadLink) {
+    alert("Download link not ready yet");
+    return;
+  }
+
+  navigator.clipboard.writeText(uploadResult.downloadLink)
+    .then(() => {
+      alert("Link copied to clipboard");
+    })
+    .catch(() => {
+      alert("Failed to copy link");
+    });
+};
+
 
   return (
     <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
