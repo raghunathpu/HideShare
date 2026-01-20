@@ -57,14 +57,14 @@ function App() {
     return;
   }
 
-  navigator.clipboard.writeText(uploadResult.downloadLink)
-    .then(() => {
-      alert("Link copied to clipboard");
-    })
-    .catch(() => {
-      alert("Failed to copy link");
-    });
+  const filename = uploadResult.downloadLink.split("/").pop();
+  const frontendLink = `https://hideshare.vercel.app/download/${filename}`;
+
+  navigator.clipboard.writeText(frontendLink)
+    .then(() => alert("Link copied to clipboard"))
+    .catch(() => alert("Failed to copy link"));
 };
+
 
 
   return (
@@ -111,29 +111,12 @@ function App() {
 
       {/* Result */}
       {uploadResult && (
-        <div style={{ marginTop: "30px" }}>
-          <h3>Download</h3>
+  <div style={{ marginTop: "30px" }}>
+    <p>✅ Upload successful</p>
+    <button onClick={copyLink}>Copy Link</button>
+  </div>
+)}
 
-          <button onClick={copyLink}>Copy Link</button>
-          <br /><br />
-
-          {uploadResult.passwordProtected && (
-            <>
-              <input
-                type="password"
-                placeholder="Enter password to download"
-                value={downloadPassword}
-                onChange={(e) => setDownloadPassword(e.target.value)}
-              />
-              <br /><br />
-            </>
-          )}
-
-          <button onClick={handleDownload}>Download File</button>
-
-          {downloadError && <p style={{ color: "red" }}>{downloadError}</p>}
-        </div>
-      )}
     </div>
   );
 }
