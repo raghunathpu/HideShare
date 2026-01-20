@@ -158,7 +158,7 @@ app.post("/upload", (req, res) => {
 
       res.json({
         message: "File uploaded successfully",
-        downloadLink: `${req.protocol}://${req.get("host")}/download/${file.filename}`,
+        downloadLink: `https://hide-share.vercel.app/download/${file.filename}`,
         passwordProtected: password ? true : false,
         expiresIn: "10 minutes"
       });
