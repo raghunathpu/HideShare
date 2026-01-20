@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 function Upload() {
   const [file, setFile] = useState(null);
@@ -6,6 +6,16 @@ function Upload() {
   const [expiry, setExpiry] = useState("10m");
   const [uploadResult, setUploadResult] = useState(null);
   const [status, setStatus] = useState("");
+  const [now, setNow] = useState(Date.now()); // ✅ NEW
+
+  // ✅ TICK EVERY SECOND
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleUpload = async () => {
     if (!file) {
@@ -40,17 +50,19 @@ function Upload() {
     navigator.clipboard.writeText(frontendLink);
     alert("Link copied");
   };
+
+  // ✅ LIVE COUNTDOWN
   const formatExpiry = (expiresAt) => {
-  if (!expiresAt) return "Permanent";
+    if (!expiresAt) return "Permanent";
 
-  const diff = new Date(expiresAt) - new Date();
-  if (diff <= 0) return "Expired";
+    const diff = new Date(expiresAt).getTime() - now;
+    if (diff <= 0) return "Expired";
 
-  const mins = Math.floor(diff / 60000);
-  const secs = Math.floor((diff % 60000) / 1000);
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
 
-  return `${mins}m ${secs}s`;
-};
+    return `${mins}m ${secs}s`;
+  };
 
   return (
     <div style={{ maxWidth: "500px", margin: "40px auto", fontFamily: "Arial" }}>
@@ -78,45 +90,43 @@ function Upload() {
       />
       <br /><br />
 
-      <label style={{ display: "block", marginTop: "10px" }}>
-  <strong>Link expiry</strong>
-  <br />
-  <select
-    value={expiry}
-    onChange={(e) => setExpiry(e.target.value)}
-    style={{ width: "100%", padding: "8px", marginTop: "5px" }}
-  >
-    <option value="10m">Expire in 10 minutes</option>
-    <option value="20m">Expire in 20 minutes</option>
-    <option value="30m">Expire in 30 minutes</option>
-    <option value="1h">Expire in 1 hour</option>
-    <option value="permanent">Permanent</option>
-  </select>
-</label>
+      <label>
+        <strong>Link expiry</strong>
+        <select
+          value={expiry}
+          onChange={(e) => setExpiry(e.target.value)}
+          style={{ width: "100%", padding: "8px", marginTop: "5px" }}
+        >
+          <option value="10m">Expire in 10 minutes</option>
+          <option value="20m">Expire in 20 minutes</option>
+          <option value="30m">Expire in 30 minutes</option>
+          <option value="1h">Expire in 1 hour</option>
+          <option value="permanent">Permanent</option>
+        </select>
+      </label>
 
-<br />
+      <br /><br />
 
       <button onClick={handleUpload}>Upload</button>
 
       {status && <p>{status}</p>}
 
       {uploadResult && (
-  <div style={{ marginTop: "20px" }}>
-    <p>✅ Upload successful</p>
+        <div style={{ marginTop: "20px" }}>
+          <p>✅ Upload successful</p>
 
-    <p>
-      ⏳ Expires in:{" "}
-      <strong>{formatExpiry(uploadResult.expiresAt)}</strong>
-    </p>
+          <p>
+            ⏳ Expires in:{" "}
+            <strong>{formatExpiry(uploadResult.expiresAt)}</strong>
+          </p>
 
-    {uploadResult.passwordProtected && (
-      <p>🔒 Password protected</p>
-    )}
+          {uploadResult.passwordProtected && (
+            <p>🔒 Password protected</p>
+          )}
 
-    <button onClick={copyLink}>Copy Link</button>
-  </div>
-)}
-
+          <button onClick={copyLink}>Copy Link</button>
+        </div>
+      )}
     </div>
   );
 }
