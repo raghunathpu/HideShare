@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import QRCode from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 
 function Download() {
   const { filename } = useParams();
@@ -145,7 +145,8 @@ function Download() {
       {expiryText !== "Expired" && (
         <div style={{ marginTop: "25px", textAlign: "center" }} ref={qrRef}>
           <p>📱 Scan QR to download</p>
-          <QRCode
+
+          <QRCodeCanvas
             value={frontendLink}
             size={180}
             level="H"

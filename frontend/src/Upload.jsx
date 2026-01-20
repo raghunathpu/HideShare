@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import QRCode from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 
 function Upload() {
   const [file, setFile] = useState(null);
@@ -146,17 +146,28 @@ function Upload() {
           <button onClick={copyLink}>Copy Link</button>
 
           <div ref={qrRef} style={{ marginTop: 20 }}>
-            <QRCode
-              value={uploadResult.downloadLink}
-              size={180}
-              level="H"
-              includeMargin
-            />
+            <QRCodeCanvas
+  value={uploadResult.downloadLink}
+  size={180}
+  level="H"
+  includeMargin={true}
+/>
+
           </div>
 
-          <button onClick={downloadQR} style={{ marginTop: 10 }}>
-            Download QR
-          </button>
+          <button
+  onClick={() => {
+    const canvas = document.getElementById("qr-canvas");
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "HideShare-QR.png";
+    a.click();
+  }}
+>
+  Download QR
+</button>
+
         </div>
       )}
     </div>
