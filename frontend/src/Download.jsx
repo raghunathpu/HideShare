@@ -13,20 +13,27 @@ function Download() {
   const [now, setNow] = useState(Date.now());
   const [downloading, setDownloading] = useState(false);
 
-  /* ⏱ Live clock */
+  useEffect(() => {
+    const saved = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  }, []);
+
+  const toggleTheme = () => {
+    const current = document.documentElement.getAttribute("data-theme");
+    const next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+  };
+
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(i);
   }, []);
 
-  /* 📡 Fetch metadata */
   useEffect(() => {
     fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
       .then(async (res) => {
-        if (!res.ok) {
-          const msg = await res.text();
-          throw new Error(msg || "File not found");
-        }
+        if (!res.ok) throw new Error("File not found");
         return res.json();
       })
       .then((data) => {
@@ -34,17 +41,12 @@ function Download() {
           ...data,
           expiresAt: data.expiresAt
             ? new Date(data.expiresAt).getTime()
-            : null,
-          downloads: data.downloads ?? 0,
-          maxDownloads: data.maxDownloads ?? 1
+            : null
         });
       })
-      .catch((err) => {
-        setError(err.message || "File not found");
-      });
+      .catch((e) => setError(e.message));
   }, [filename]);
 
-  /* ⏳ Expiry text */
   const expiryText = (() => {
     if (!fileInfo?.expiresAt) return "Permanent";
     const diff = fileInfo.expiresAt - now;
@@ -54,44 +56,29 @@ function Download() {
     )}s`;
   })();
 
-  /* 🔁 Redirect after expiry */
   useEffect(() => {
     if (expiryText === "Expired") {
-      const t = setTimeout(() => navigate("/"), 5000);
-      return () => clearTimeout(t);
+      setTimeout(() => navigate("/"), 5000);
     }
   }, [expiryText, navigate]);
 
-  /* ⬇ Download */
   const download = async () => {
     setDownloading(true);
-
     let url = `https://hideshare-backend.onrender.com/download/${filename}`;
     if (password) url += `?password=${encodeURIComponent(password)}`;
 
     try {
       const res = await fetch(url);
-      if (!res.ok) {
-        const msg = await res.text();
-        setDownloading(false);
-        setError(msg);
-        setTimeout(() => navigate("/"), 3000);
-        return;
-      }
-
+      if (!res.ok) throw new Error(await res.text());
       window.open(url, "_blank");
-    } catch {
-      setError("Download failed");
+    } catch (e) {
+      alert(e.message);
     }
-
     setDownloading(false);
   };
 
-  /* 📥 Download QR */
   const downloadQR = () => {
-    const canvas = qrRef.current?.querySelector("canvas");
-    if (!canvas) return;
-
+    const canvas = qrRef.current.querySelector("canvas");
     const url = canvas.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
@@ -99,20 +86,16 @@ function Download() {
     a.click();
   };
 
-  /* ❌ Error */
-  if (error) {
+  if (error)
     return (
       <div className="page">
         <div className="card">
-          <p className="error">❌ {error}</p>
-          <button onClick={() => navigate("/")}>⬅ Go Back</button>
+          <p className="error">{error}</p>
         </div>
       </div>
     );
-  }
 
-  /* ⏳ Loading */
-  if (!fileInfo) {
+  if (!fileInfo)
     return (
       <div className="page">
         <div className="card">
@@ -120,27 +103,20 @@ function Download() {
         </div>
       </div>
     );
-  }
-
-  const remaining =
-    fileInfo.maxDownloads === 9999
-      ? "Unlimited"
-      : Math.max(fileInfo.maxDownloads - fileInfo.downloads, 0);
-
-  const exhausted =
-    fileInfo.maxDownloads !== 9999 &&
-    fileInfo.downloads >= fileInfo.maxDownloads;
 
   const frontendLink = `https://hideshare.vercel.app/download/${filename}`;
 
   return (
     <div className="page">
       <div className="card">
+        <button className="theme-toggle" onClick={toggleTheme}>
+          🌙 / ☀️
+        </button>
+
         <h2>Download File</h2>
 
         <p><strong>📄 File:</strong> {fileInfo.originalName}</p>
         <p><strong>📦 Size:</strong> {(fileInfo.size / 1024).toFixed(2)} KB</p>
-        <p><strong>⬇ Remaining downloads:</strong> {remaining}</p>
 
         <div className="divider" />
 
@@ -153,27 +129,23 @@ function Download() {
 
         <input
           type="password"
-          placeholder="🔒 Enter password (if required)"
+          placeholder="🔒 Enter password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
         <button
           onClick={download}
-          disabled={expiryText === "Expired" || exhausted || downloading}
+          disabled={expiryText === "Expired" || downloading}
         >
           {downloading ? "Downloading…" : "⬇ Download"}
         </button>
 
-        {exhausted && (
-          <p className="error">❌ Download limit reached</p>
-        )}
-
-        {expiryText !== "Expired" && !exhausted && (
+        {expiryText !== "Expired" && (
           <>
             <div className="divider" />
-            <div ref={qrRef} className="qr-box" style={{ textAlign: "center" }}>
-              <p>📱 Scan QR to download</p>
+            <div className="qr-box" ref={qrRef} style={{ textAlign: "center" }}>
+              <p>📱 Scan QR</p>
               <QRCodeCanvas
                 value={frontendLink}
                 size={180}

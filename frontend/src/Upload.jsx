@@ -12,11 +12,24 @@ function Upload() {
 
   const qrRef = useRef(null);
 
-  /* ⏱ Tick every second */
+  /* ⏱ live timer */
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(i);
   }, []);
+
+  /* 🌗 theme */
+  useEffect(() => {
+    const saved = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", saved);
+  }, []);
+
+  const toggleTheme = () => {
+    const current = document.documentElement.getAttribute("data-theme");
+    const next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+  };
 
   const handleUpload = async () => {
     if (!file) {
@@ -37,10 +50,13 @@ function Upload() {
         "https://hideshare-backend.onrender.com/upload",
         { method: "POST", body: formData }
       );
+
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+
       setUploadResult(data);
       setStatus("");
-    } catch {
+    } catch (e) {
       setStatus("❌ Upload failed");
     }
   };
@@ -75,21 +91,12 @@ function Upload() {
   return (
     <div className="page">
       <div className="card">
-        <button
-  className="theme-toggle"
-  onClick={() => {
-    const current = document.documentElement.getAttribute("data-theme");
-    const next = current === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("theme", next);
-  }}
->
-  🌙 / ☀️
-</button>
+        <button className="theme-toggle" onClick={toggleTheme}>
+          🌙 / ☀️
+        </button>
 
         <h2>HideShare</h2>
 
-        {/* Upload Section */}
         <div
           className="drop-box"
           onDragOver={(e) => e.preventDefault()}
@@ -98,14 +105,11 @@ function Upload() {
             setFile(e.dataTransfer.files[0]);
           }}
         >
-          {file ? <strong>{file.name}</strong> : <p>📁 Drag & drop your file</p>}
+          {file ? <strong>{file.name}</strong> : <p>📁 Drag & drop file</p>}
         </div>
 
         <input type="file" onChange={(e) => setFile(e.target.files[0])} />
 
-        <div className="divider" />
-
-        {/* Security */}
         <input
           type="password"
           placeholder="🔒 Optional password"
@@ -130,26 +134,21 @@ function Upload() {
             value={maxDownloads}
             onChange={(e) => setMaxDownloads(Number(e.target.value))}
           >
-            <option value={1}>1 time (secure)</option>
-            <option value={2}>2 times</option>
-            <option value={5}>5 times</option>
+            <option value={1}>1 (secure)</option>
+            <option value={2}>2</option>
+            <option value={5}>5</option>
             <option value={9999}>Unlimited</option>
           </select>
         </label>
 
         <button onClick={handleUpload}>🚀 Upload</button>
-
         {status && <p className="warning">{status}</p>}
 
-        {/* Result Section */}
         {uploadResult && (
           <>
             <div className="divider" />
-
             <p className="success">✅ Upload successful</p>
-            <p style={{ textAlign: "center" }}>
-              ⏳ Expires in: <strong>{expiryText}</strong>
-            </p>
+            <p>⏳ Expires in: <strong>{expiryText}</strong></p>
 
             <button onClick={copyLink}>📋 Copy Link</button>
 
