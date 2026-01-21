@@ -34,7 +34,9 @@ function Download() {
           ...data,
           expiresAt: data.expiresAt
             ? new Date(data.expiresAt).getTime()
-            : null
+            : null,
+          downloads: data.downloads ?? 0,
+          maxDownloads: data.maxDownloads ?? 1
         });
       })
       .catch((err) => {
@@ -71,14 +73,15 @@ function Download() {
       const res = await fetch(url);
       if (!res.ok) {
         const msg = await res.text();
-        alert(msg);
         setDownloading(false);
+        setError(msg);
         setTimeout(() => navigate("/"), 3000);
         return;
       }
+
       window.open(url, "_blank");
     } catch {
-      alert("Download failed");
+      setError("Download failed");
     }
 
     setDownloading(false);
@@ -119,6 +122,15 @@ function Download() {
     );
   }
 
+  const remaining =
+    fileInfo.maxDownloads === 9999
+      ? "Unlimited"
+      : Math.max(fileInfo.maxDownloads - fileInfo.downloads, 0);
+
+  const exhausted =
+    fileInfo.maxDownloads !== 9999 &&
+    fileInfo.downloads >= fileInfo.maxDownloads;
+
   const frontendLink = `https://hideshare.vercel.app/download/${filename}`;
 
   return (
@@ -128,13 +140,7 @@ function Download() {
 
         <p><strong>📄 File:</strong> {fileInfo.originalName}</p>
         <p><strong>📦 Size:</strong> {(fileInfo.size / 1024).toFixed(2)} KB</p>
-        <p>
-          <strong>⬇ Remaining downloads:</strong>{" "}
-          {fileInfo.maxDownloads === 9999
-            ? "Unlimited"
-            : Math.max(fileInfo.maxDownloads - fileInfo.downloads, 0)}
-        </p>
-
+        <p><strong>⬇ Remaining downloads:</strong> {remaining}</p>
 
         <div className="divider" />
 
@@ -154,26 +160,16 @@ function Download() {
 
         <button
           onClick={download}
-          disabled={
-            expiryText === "Expired" ||
-            (fileInfo.maxDownloads !== 9999 &&
-              fileInfo.downloads >= fileInfo.maxDownloads)
-          }
+          disabled={expiryText === "Expired" || exhausted || downloading}
         >
           {downloading ? "Downloading…" : "⬇ Download"}
         </button>
-        {fileInfo.maxDownloads !== 9999 &&
-          fileInfo.downloads >= fileInfo.maxDownloads && (
-            <p className="error">
-              ❌ Download limit reached
-            </p>
-          )}
 
-        <p className="warning">
-          ⚠ This file can be downloaded only once
-        </p>
+        {exhausted && (
+          <p className="error">❌ Download limit reached</p>
+        )}
 
-        {expiryText !== "Expired" && (
+        {expiryText !== "Expired" && !exhausted && (
           <>
             <div className="divider" />
             <div ref={qrRef} className="qr-box" style={{ textAlign: "center" }}>

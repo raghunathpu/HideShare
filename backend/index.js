@@ -14,18 +14,52 @@ const multer = require("multer");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 require("dotenv").config();
 
 console.log("INDEX.JS LOADED");
 
 const app = express();
-app.use(cors());
+
+/* =======================
+   SECURITY MIDDLEWARE
+======================= */
+
+// 🔐 Secure headers
+app.use(helmet());
+
+// 🌐 CORS (ONLY frontend allowed)
+app.use(
+  cors({
+    origin: "https://hideshare.vercel.app",
+    methods: ["GET", "POST"],
+  })
+);
+
 app.use(express.json());
+
+/* =======================
+   RATE LIMITERS
+======================= */
+
+const uploadLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 min
+  max: 10,
+  message: "Too many uploads. Try again later."
+});
+
+const downloadLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 min
+  max: 20,
+  message: "Too many requests. Try again later."
+});
 
 /* =======================
    CONFIG
 ======================= */
+
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 const allowedMimeTypes = [
@@ -47,6 +81,7 @@ const allowedExtensions = [
 /* =======================
    MONGODB
 ======================= */
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.log("Mongo error:", err));
@@ -54,6 +89,7 @@ mongoose.connect(process.env.MONGO_URI)
 /* =======================
    MULTER
 ======================= */
+
 const upload = multer({
   dest: "uploads/",
   limits: { fileSize: MAX_FILE_SIZE },
@@ -75,7 +111,7 @@ const upload = multer({
 ======================= */
 
 /* 📄 FILE METADATA */
-app.get("/meta/:filename", async (req, res) => {
+app.get("/meta/:filename", downloadLimiter, async (req, res) => {
   const file = await File.findOne({ filename: req.params.filename });
 
   if (!file) return res.status(404).json({ error: "File not found" });
@@ -92,12 +128,12 @@ app.get("/meta/:filename", async (req, res) => {
     downloadsLeft:
       file.maxDownloads === null
         ? null
-        : file.maxDownloads - file.downloads
+        : Math.max(file.maxDownloads - file.downloads, 0)
   });
 });
 
 /* ⬇ DOWNLOAD */
-app.get("/download/:filename", async (req, res) => {
+app.get("/download/:filename", downloadLimiter, async (req, res) => {
   const file = await File.findOne({ filename: req.params.filename });
   if (!file) return res.status(404).send("File not found");
 
@@ -105,12 +141,10 @@ app.get("/download/:filename", async (req, res) => {
     return res.status(410).send("Link expired");
   }
 
-  // 🔒 Max downloads check
   if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
-    return res.status(410).send("Link already used");
+    return res.status(410).send("Download limit reached");
   }
 
-  // 🔐 Password check
   if (file.password) {
     const pw = req.query.password;
     if (!pw) return res.status(401).send("Password required");
@@ -130,17 +164,16 @@ app.get("/download/:filename", async (req, res) => {
     file.downloads += 1;
     await file.save();
 
-    // 🧹 Delete only when limit reached
     if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
-      fs.unlink(filePath, () => {
-        console.log("File deleted after max downloads:", file.filename);
-      });
+      fs.unlink(filePath, () =>
+        console.log("File deleted:", file.filename)
+      );
     }
   });
 });
 
 /* ⬆ UPLOAD */
-app.post("/upload", (req, res) => {
+app.post("/upload", uploadLimiter, (req, res) => {
   upload.single("file")(req, res, async err => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -148,9 +181,8 @@ app.post("/upload", (req, res) => {
     const password = req.body.password || null;
     const expiry = req.body.expiry || "10m";
 
-    // 🔢 max downloads
     let maxDownloads = parseInt(req.body.maxDownloads || "1");
-    if (maxDownloads >= 9999) maxDownloads = null; // unlimited
+    if (maxDownloads >= 9999) maxDownloads = null;
 
     const hashedPassword = password
       ? await bcrypt.hash(password, 10)
@@ -185,6 +217,7 @@ app.post("/upload", (req, res) => {
 /* =======================
    CLEANUP JOB
 ======================= */
+
 setInterval(async () => {
   const now = new Date();
   const files = await File.find({});
@@ -201,6 +234,7 @@ setInterval(async () => {
 /* =======================
    SERVER
 ======================= */
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
   console.log(`Server running on ${PORT}`)
