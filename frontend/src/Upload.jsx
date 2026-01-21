@@ -91,9 +91,15 @@ function Upload() {
   return (
     <div className="page">
       <div className="card">
-        <button className="theme-toggle" onClick={toggleTheme}>
-          🌙 / ☀️
-        </button>
+       <button className="theme-toggle" onClick={toggleTheme}>
+  {document.documentElement.getAttribute("data-theme") === "dark"
+    ? "Light"
+    : "Dark"}
+</button>
+
+
+
+
 
         <h2>HideShare</h2>
 

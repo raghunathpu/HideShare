@@ -171,14 +171,25 @@ app.get("/download/:filename", downloadLimiter, async (req, res) => {
   if (!fs.existsSync(filePath))
     return res.status(410).send("File missing");
 
-  res.download(filePath, file.originalName, async () => {
-    file.downloads += 1;
-    await file.save();
+  file.downloads += 1;
+await file.save();
 
-    if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
-      fs.unlink(filePath, () => {});
-    }
-  });
+res.download(filePath, file.originalName, async (err) => {
+  if (err) {
+    // rollback if download failed
+    file.downloads -= 1;
+    await file.save();
+    return;
+  }
+
+  // delete only AFTER successful allowed download
+  if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
+    fs.unlink(filePath, () => {
+      console.log("File deleted after download:", file.filename);
+    });
+  }
+});
+
 });
 
 // ⬆ UPLOAD

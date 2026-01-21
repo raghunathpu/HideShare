@@ -68,18 +68,37 @@ body {
    THEME TOGGLE
 ===================== */
 
+/* =====================
+   THEME TOGGLE (FIXED)
+===================== */
+
 .theme-toggle {
-  position: absolute;
+  position: fixed;
   top: 14px;
   right: 14px;
-  border: none;
-  background: var(--border);
-  border-radius: 999px;
-  padding: 6px 10px;
-  cursor: pointer;
-  font-size: 14px;
+
+  width: auto;              /* override global button */
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+
+  background: var(--card);
   color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+
+  cursor: pointer;
+  z-index: 1000;
+
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
+
+/* hover */
+.theme-toggle:hover {
+  background: var(--bg);
+}
+
+
 
 /* =====================
    HEADINGS

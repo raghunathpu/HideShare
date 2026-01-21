@@ -1,11 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
-import { QRCodeCanvas } from "qrcode.react";
+import { useEffect, useState } from "react";
 
 function Download() {
   const { filename } = useParams();
   const navigate = useNavigate();
-  const qrRef = useRef(null);
 
   const [fileInfo, setFileInfo] = useState(null);
   const [password, setPassword] = useState("");
@@ -13,11 +11,13 @@ function Download() {
   const [now, setNow] = useState(Date.now());
   const [downloading, setDownloading] = useState(false);
 
+  /* 🌗 Load saved theme */
   useEffect(() => {
     const saved = localStorage.getItem("theme") || "light";
     document.documentElement.setAttribute("data-theme", saved);
   }, []);
 
+  /* 🌗 Toggle theme */
   const toggleTheme = () => {
     const current = document.documentElement.getAttribute("data-theme");
     const next = current === "dark" ? "light" : "dark";
@@ -25,11 +25,13 @@ function Download() {
     localStorage.setItem("theme", next);
   };
 
+  /* ⏱ Live clock */
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(i);
   }, []);
 
+  /* 📡 Fetch file metadata */
   useEffect(() => {
     fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
       .then(async (res) => {
@@ -47,6 +49,7 @@ function Download() {
       .catch((e) => setError(e.message));
   }, [filename]);
 
+  /* ⏳ Expiry countdown */
   const expiryText = (() => {
     if (!fileInfo?.expiresAt) return "Permanent";
     const diff = fileInfo.expiresAt - now;
@@ -56,14 +59,18 @@ function Download() {
     )}s`;
   })();
 
+  /* 🔁 Redirect after expiry */
   useEffect(() => {
     if (expiryText === "Expired") {
-      setTimeout(() => navigate("/"), 5000);
+      const t = setTimeout(() => navigate("/"), 5000);
+      return () => clearTimeout(t);
     }
   }, [expiryText, navigate]);
 
+  /* ⬇ Download */
   const download = async () => {
     setDownloading(true);
+
     let url = `https://hideshare-backend.onrender.com/download/${filename}`;
     if (password) url += `?password=${encodeURIComponent(password)}`;
 
@@ -74,28 +81,24 @@ function Download() {
     } catch (e) {
       alert(e.message);
     }
+
     setDownloading(false);
   };
 
-  const downloadQR = () => {
-    const canvas = qrRef.current.querySelector("canvas");
-    const url = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "HideShare-QR.png";
-    a.click();
-  };
-
-  if (error)
+  /* ❌ Error */
+  if (error) {
     return (
       <div className="page">
         <div className="card">
           <p className="error">{error}</p>
+          <button onClick={() => navigate("/")}>⬅ Go Back</button>
         </div>
       </div>
     );
+  }
 
-  if (!fileInfo)
+  /* ⏳ Loading */
+  if (!fileInfo) {
     return (
       <div className="page">
         <div className="card">
@@ -103,14 +106,15 @@ function Download() {
         </div>
       </div>
     );
-
-  const frontendLink = `https://hideshare.vercel.app/download/${filename}`;
+  }
 
   return (
     <div className="page">
       <div className="card">
         <button className="theme-toggle" onClick={toggleTheme}>
-          🌙 / ☀️
+          {document.documentElement.getAttribute("data-theme") === "dark"
+            ? "Light"
+            : "Dark"}
         </button>
 
         <h2>Download File</h2>
@@ -129,7 +133,7 @@ function Download() {
 
         <input
           type="password"
-          placeholder="🔒 Enter password"
+          placeholder="Enter password (if required)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
@@ -141,22 +145,12 @@ function Download() {
           {downloading ? "Downloading…" : "⬇ Download"}
         </button>
 
-        {expiryText !== "Expired" && (
-          <>
-            <div className="divider" />
-            <div className="qr-box" ref={qrRef} style={{ textAlign: "center" }}>
-              <p>📱 Scan QR</p>
-              <QRCodeCanvas
-                value={frontendLink}
-                size={180}
-                level="H"
-                includeMargin
-              />
-              <button style={{ marginTop: 10 }} onClick={downloadQR}>
-                ⬇ Download QR
-              </button>
-            </div>
-          </>
+        <p className="warning">
+          ⚠ This file can be downloaded only once
+        </p>
+
+        {expiryText === "Expired" && (
+          <p className="error">❌ Link expired. Redirecting…</p>
         )}
       </div>
     </div>
