@@ -1,56 +1,94 @@
-import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 
-function Upload() {
-  const [file, setFile] = useState(null);
-  const [password, setPassword] = useState("");
-  const [expiry, setExpiry] = useState("10m");
-  const [maxDownloads, setMaxDownloads] = useState(1);
-  const [uploadResult, setUploadResult] = useState(null);
-  const [status, setStatus] = useState("");
-  const [now, setNow] = useState(Date.now());
-
+function Download() {
+  const { filename } = useParams();
+  const navigate = useNavigate();
   const qrRef = useRef(null);
 
+  const [fileInfo, setFileInfo] = useState(null);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [now, setNow] = useState(Date.now());
+  const [downloading, setDownloading] = useState(false);
+
+  /* ⏱ Live clock */
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(i);
   }, []);
 
-  const handleUpload = async () => {
-    if (!file) {
-      setStatus("❌ Please select a file");
-      return;
+  /* 📡 Fetch metadata */
+  useEffect(() => {
+    fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const msg = await res.text();
+          throw new Error(msg || "File not found");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setFileInfo({
+          ...data,
+          expiresAt: data.expiresAt
+            ? new Date(data.expiresAt).getTime()
+            : null
+        });
+      })
+      .catch((err) => {
+        setError(err.message || "File not found");
+      });
+  }, [filename]);
+
+  /* ⏳ Expiry text */
+  const expiryText = (() => {
+    if (!fileInfo?.expiresAt) return "Permanent";
+    const diff = fileInfo.expiresAt - now;
+    if (diff <= 0) return "Expired";
+    return `${Math.floor(diff / 60000)}m ${Math.floor(
+      (diff % 60000) / 1000
+    )}s`;
+  })();
+
+  /* 🔁 Redirect after expiry */
+  useEffect(() => {
+    if (expiryText === "Expired") {
+      const t = setTimeout(() => navigate("/"), 5000);
+      return () => clearTimeout(t);
     }
+  }, [expiryText, navigate]);
 
-    setStatus("⏳ Uploading...");
+  /* ⬇ Download */
+  const download = async () => {
+    setDownloading(true);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    if (password) formData.append("password", password);
-    formData.append("expiry", expiry);
-    formData.append("maxDownloads", maxDownloads);
+    let url = `https://hideshare-backend.onrender.com/download/${filename}`;
+    if (password) url += `?password=${encodeURIComponent(password)}`;
 
     try {
-      const res = await fetch(
-        "https://hideshare-backend.onrender.com/upload",
-        { method: "POST", body: formData }
-      );
-      const data = await res.json();
-      setUploadResult(data);
-      setStatus("");
+      const res = await fetch(url);
+      if (!res.ok) {
+        const msg = await res.text();
+        alert(msg);
+        setDownloading(false);
+        setTimeout(() => navigate("/"), 3000);
+        return;
+      }
+      window.open(url, "_blank");
     } catch {
-      setStatus("❌ Upload failed");
+      alert("Download failed");
     }
+
+    setDownloading(false);
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(uploadResult.downloadLink);
-    alert("Link copied");
-  };
-
+  /* 📥 Download QR */
   const downloadQR = () => {
-    const canvas = qrRef.current.querySelector("canvas");
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+
     const url = canvas.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
@@ -58,93 +96,96 @@ function Upload() {
     a.click();
   };
 
-  const expiryText = uploadResult
-    ? (() => {
-        if (!uploadResult.expiresAt) return "Permanent";
-        const diff = new Date(uploadResult.expiresAt).getTime() - now;
-        if (diff <= 0) return "Expired";
-        return `${Math.floor(diff / 60000)}m ${Math.floor(
-          (diff % 60000) / 1000
-        )}s`;
-      })()
-    : "";
+  /* ❌ Error */
+  if (error) {
+    return (
+      <div className="page">
+        <div className="card">
+          <p className="error">❌ {error}</p>
+          <button onClick={() => navigate("/")}>⬅ Go Back</button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ⏳ Loading */
+  if (!fileInfo) {
+    return (
+      <div className="page">
+        <div className="card">
+          <p>Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const frontendLink = `https://hideshare.vercel.app/download/${filename}`;
 
   return (
     <div className="page">
       <div className="card">
-        <h2>HideShare</h2>
+        <h2>Download File</h2>
 
-        <div
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            setFile(e.dataTransfer.files[0]);
-          }}
-          className="dropzone"
-        >
-          {file ? <strong>{file.name}</strong> : "Drag & drop file here"}
-        </div>
+        <p><strong>📄 File:</strong> {fileInfo.originalName}</p>
+        <p><strong>📦 Size:</strong> {(fileInfo.size / 1024).toFixed(2)} KB</p>
+        <p>
+          <strong>⬇ Remaining downloads:</strong>{" "}
+          {fileInfo.maxDownloads === 9999
+            ? "Unlimited"
+            : Math.max(fileInfo.maxDownloads - fileInfo.downloads, 0)}
+        </p>
 
-        <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+
+        <div className="divider" />
+
+        <p>
+          ⏳ <strong>Expires in:</strong>{" "}
+          <span className={expiryText === "Expired" ? "error" : ""}>
+            {expiryText}
+          </span>
+        </p>
 
         <input
           type="password"
-          placeholder="Optional password"
+          placeholder="🔒 Enter password (if required)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <label>
-          <strong>Link expiry</strong>
-          <select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
-            <option value="10m">10 minutes</option>
-            <option value="20m">20 minutes</option>
-            <option value="30m">30 minutes</option>
-            <option value="1h">1 hour</option>
-            <option value="permanent">Permanent</option>
-          </select>
-        </label>
+        <button
+          onClick={download}
+          disabled={
+            expiryText === "Expired" ||
+            (fileInfo.maxDownloads !== 9999 &&
+              fileInfo.downloads >= fileInfo.maxDownloads)
+          }
+        >
+          {downloading ? "Downloading…" : "⬇ Download"}
+        </button>
+        {fileInfo.maxDownloads !== 9999 &&
+          fileInfo.downloads >= fileInfo.maxDownloads && (
+            <p className="error">
+              ❌ Download limit reached
+            </p>
+          )}
 
-        <label>
-          <strong>Max downloads</strong>
-          <select
-            value={maxDownloads}
-            onChange={(e) => setMaxDownloads(Number(e.target.value))}
-          >
-            <option value={1}>1 time</option>
-            <option value={2}>2 times</option>
-            <option value={5}>5 times</option>
-            <option value={9999}>Unlimited</option>
-          </select>
-        </label>
+        <p className="warning">
+          ⚠ This file can be downloaded only once
+        </p>
 
-        <button onClick={handleUpload}>Upload</button>
-
-        {status && <p className="warning">{status}</p>}
-
-        {uploadResult && (
+        {expiryText !== "Expired" && (
           <>
             <div className="divider" />
-            <p className="success">✅ Upload successful</p>
-            <p>⏳ Expires in: <strong>{expiryText}</strong></p>
-
-            <button className="secondary-btn" onClick={copyLink}>
-              Copy Link
-            </button>
-
-            <div ref={qrRef} className="qr-box">
+            <div ref={qrRef} className="qr-box" style={{ textAlign: "center" }}>
+              <p>📱 Scan QR to download</p>
               <QRCodeCanvas
-                value={uploadResult.downloadLink}
+                value={frontendLink}
                 size={180}
                 level="H"
                 includeMargin
               />
-              <button
-                className="secondary-btn"
-                style={{ marginTop: 10 }}
-                onClick={downloadQR}
-              >
-                Download QR
+              <button style={{ marginTop: 10 }} onClick={downloadQR}>
+                ⬇ Download QR
               </button>
             </div>
           </>
@@ -154,4 +195,4 @@ function Upload() {
   );
 }
 
-export default Upload;
+export default Download;

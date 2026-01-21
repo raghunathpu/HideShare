@@ -12,6 +12,7 @@ function Upload() {
 
   const qrRef = useRef(null);
 
+  /* ⏱ Tick every second */
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(i);
@@ -58,44 +59,62 @@ function Upload() {
     a.click();
   };
 
+  const formatExpiry = (expiresAt) => {
+    if (!expiresAt) return "Permanent";
+    const diff = new Date(expiresAt).getTime() - now;
+    if (diff <= 0) return "Expired";
+    return `${Math.floor(diff / 60000)}m ${Math.floor(
+      (diff % 60000) / 1000
+    )}s`;
+  };
+
   const expiryText = uploadResult
-    ? (() => {
-        if (!uploadResult.expiresAt) return "Permanent";
-        const diff = new Date(uploadResult.expiresAt).getTime() - now;
-        if (diff <= 0) return "Expired";
-        return `${Math.floor(diff / 60000)}m ${Math.floor(
-          (diff % 60000) / 1000
-        )}s`;
-      })()
+    ? formatExpiry(uploadResult.expiresAt)
     : "";
 
   return (
     <div className="page">
       <div className="card">
+        <button
+  className="theme-toggle"
+  onClick={() => {
+    const current = document.documentElement.getAttribute("data-theme");
+    const next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+  }}
+>
+  🌙 / ☀️
+</button>
+
         <h2>HideShare</h2>
 
+        {/* Upload Section */}
         <div
+          className="drop-box"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
             setFile(e.dataTransfer.files[0]);
           }}
-          className="dropzone"
         >
-          {file ? <strong>{file.name}</strong> : "Drag & drop file here"}
+          {file ? <strong>{file.name}</strong> : <p>📁 Drag & drop your file</p>}
         </div>
 
         <input type="file" onChange={(e) => setFile(e.target.files[0])} />
 
+        <div className="divider" />
+
+        {/* Security */}
         <input
           type="password"
-          placeholder="Optional password"
+          placeholder="🔒 Optional password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
         <label>
-          <strong>Link expiry</strong>
+          <strong>⏳ Link expiry</strong>
           <select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
             <option value="10m">10 minutes</option>
             <option value="20m">20 minutes</option>
@@ -106,45 +125,44 @@ function Upload() {
         </label>
 
         <label>
-          <strong>Max downloads</strong>
+          <strong>📥 Max downloads</strong>
           <select
             value={maxDownloads}
             onChange={(e) => setMaxDownloads(Number(e.target.value))}
           >
-            <option value={1}>1 time</option>
+            <option value={1}>1 time (secure)</option>
             <option value={2}>2 times</option>
             <option value={5}>5 times</option>
             <option value={9999}>Unlimited</option>
           </select>
         </label>
 
-        <button onClick={handleUpload}>Upload</button>
+        <button onClick={handleUpload}>🚀 Upload</button>
 
         {status && <p className="warning">{status}</p>}
 
+        {/* Result Section */}
         {uploadResult && (
           <>
             <div className="divider" />
+
             <p className="success">✅ Upload successful</p>
-            <p>⏳ Expires in: <strong>{expiryText}</strong></p>
+            <p style={{ textAlign: "center" }}>
+              ⏳ Expires in: <strong>{expiryText}</strong>
+            </p>
 
-            <button className="secondary-btn" onClick={copyLink}>
-              Copy Link
-            </button>
+            <button onClick={copyLink}>📋 Copy Link</button>
 
-            <div ref={qrRef} className="qr-box">
+            <div className="qr-box" ref={qrRef} style={{ textAlign: "center" }}>
+              <p>📱 Scan QR to download</p>
               <QRCodeCanvas
                 value={uploadResult.downloadLink}
                 size={180}
                 level="H"
                 includeMargin
               />
-              <button
-                className="secondary-btn"
-                style={{ marginTop: 10 }}
-                onClick={downloadQR}
-              >
-                Download QR
+              <button style={{ marginTop: 10 }} onClick={downloadQR}>
+                ⬇ Download QR
               </button>
             </div>
           </>
