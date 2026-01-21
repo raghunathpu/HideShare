@@ -63,22 +63,14 @@ function Download() {
     }
   }, [expiryText, navigate]);
 
-  const download = async () => {
-    setDownloading(true);
+  const download = () => {
+  let url = `https://hideshare-backend.onrender.com/download/${filename}`;
+  if (password) url += `?password=${encodeURIComponent(password)}`;
 
-    let url = `https://hideshare-backend.onrender.com/download/${filename}`;
-    if (password) url += `?password=${encodeURIComponent(password)}`;
+  // ONE request only → backend counter correct
+  window.location.href = url;
+};
 
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(await res.text());
-      window.open(url, "_blank");
-    } catch (e) {
-      alert(e.message);
-    }
-
-    setDownloading(false);
-  };
 
   if (error)
     return (

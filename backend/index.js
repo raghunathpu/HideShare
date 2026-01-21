@@ -153,12 +153,16 @@ app.get("/download/:filename", downloadLimiter, async (req, res) => {
   const file = await File.findOne({ filename: req.params.filename });
   if (!file) return res.status(404).send("File not found");
 
-  if (file.expiresAt && file.expiresAt < new Date())
+  if (file.expiresAt && file.expiresAt < new Date()) {
     return res.status(410).send("Link expired");
+  }
 
-  if (file.maxDownloads !== null && file.downloads >= file.maxDownloads)
+  // max downloads check
+  if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
     return res.status(410).send("Download limit reached");
+  }
 
+  // password check
   if (file.password) {
     const pw = req.query.password;
     if (!pw) return res.status(401).send("Password required");
@@ -168,29 +172,23 @@ app.get("/download/:filename", downloadLimiter, async (req, res) => {
   }
 
   const filePath = path.join(__dirname, "uploads", file.filename);
-  if (!fs.existsSync(filePath))
+  if (!fs.existsSync(filePath)) {
+    await file.deleteOne();
     return res.status(410).send("File missing");
+  }
 
+  // ✅ increment BEFORE sending
   file.downloads += 1;
-await file.save();
+  await file.save();
 
-res.download(filePath, file.originalName, async (err) => {
-  if (err) {
-    // rollback if download failed
-    file.downloads -= 1;
-    await file.save();
-    return;
-  }
-
-  // delete only AFTER successful allowed download
-  if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
-    fs.unlink(filePath, () => {
-      console.log("File deleted after download:", file.filename);
-    });
-  }
+  res.download(filePath, file.originalName, async () => {
+    // delete ONLY after limit reached
+    if (file.maxDownloads !== null && file.downloads >= file.maxDownloads) {
+      fs.unlink(filePath, () => {});
+    }
+  });
 });
 
-});
 
 // ⬆ UPLOAD
 app.post(
