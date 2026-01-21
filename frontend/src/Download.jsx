@@ -11,13 +11,12 @@ function Download() {
   const [now, setNow] = useState(Date.now());
   const [downloading, setDownloading] = useState(false);
 
-  /* 🌗 Load saved theme */
+  /* 🌗 Theme */
   useEffect(() => {
     const saved = localStorage.getItem("theme") || "light";
     document.documentElement.setAttribute("data-theme", saved);
   }, []);
 
-  /* 🌗 Toggle theme */
   const toggleTheme = () => {
     const current = document.documentElement.getAttribute("data-theme");
     const next = current === "dark" ? "light" : "dark";
@@ -25,13 +24,13 @@ function Download() {
     localStorage.setItem("theme", next);
   };
 
-  /* ⏱ Live clock */
+  /* ⏱ Clock */
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(i);
   }, []);
 
-  /* 📡 Fetch file metadata */
+  /* 📡 Metadata */
   useEffect(() => {
     fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
       .then(async (res) => {
@@ -49,7 +48,6 @@ function Download() {
       .catch((e) => setError(e.message));
   }, [filename]);
 
-  /* ⏳ Expiry countdown */
   const expiryText = (() => {
     if (!fileInfo?.expiresAt) return "Permanent";
     const diff = fileInfo.expiresAt - now;
@@ -59,15 +57,12 @@ function Download() {
     )}s`;
   })();
 
-  /* 🔁 Redirect after expiry */
   useEffect(() => {
     if (expiryText === "Expired") {
-      const t = setTimeout(() => navigate("/"), 5000);
-      return () => clearTimeout(t);
+      setTimeout(() => navigate("/"), 5000);
     }
   }, [expiryText, navigate]);
 
-  /* ⬇ Download */
   const download = async () => {
     setDownloading(true);
 
@@ -85,20 +80,17 @@ function Download() {
     setDownloading(false);
   };
 
-  /* ❌ Error */
-  if (error) {
+  if (error)
     return (
       <div className="page">
         <div className="card">
           <p className="error">{error}</p>
-          <button onClick={() => navigate("/")}>⬅ Go Back</button>
+          <button onClick={() => navigate("/")}>Go Back</button>
         </div>
       </div>
     );
-  }
 
-  /* ⏳ Loading */
-  if (!fileInfo) {
+  if (!fileInfo)
     return (
       <div className="page">
         <div className="card">
@@ -106,7 +98,6 @@ function Download() {
         </div>
       </div>
     );
-  }
 
   return (
     <div className="page">
@@ -119,13 +110,13 @@ function Download() {
 
         <h2>Download File</h2>
 
-        <p><strong>📄 File:</strong> {fileInfo.originalName}</p>
-        <p><strong>📦 Size:</strong> {(fileInfo.size / 1024).toFixed(2)} KB</p>
+        <p><strong>File:</strong> {fileInfo.originalName}</p>
+        <p><strong>Size:</strong> {(fileInfo.size / 1024).toFixed(2)} KB</p>
 
         <div className="divider" />
 
         <p>
-          ⏳ <strong>Expires in:</strong>{" "}
+          Expires in:{" "}
           <span className={expiryText === "Expired" ? "error" : ""}>
             {expiryText}
           </span>
@@ -142,16 +133,12 @@ function Download() {
           onClick={download}
           disabled={expiryText === "Expired" || downloading}
         >
-          {downloading ? "Downloading…" : "⬇ Download"}
+          {downloading ? "Downloading…" : "Download"}
         </button>
 
         <p className="warning">
-          ⚠ This file can be downloaded only once
+          Download limit is enforced securely
         </p>
-
-        {expiryText === "Expired" && (
-          <p className="error">❌ Link expired. Redirecting…</p>
-        )}
       </div>
     </div>
   );
