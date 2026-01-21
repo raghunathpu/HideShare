@@ -3,7 +3,7 @@ const EXPIRY_OPTIONS = {
   "20m": 20 * 60 * 1000,
   "30m": 30 * 60 * 1000,
   "1h": 60 * 60 * 1000,
-  permanent: null,
+  "permanent": null,
 };
 
 const File = require("./models/File");
@@ -25,7 +25,6 @@ const app = express();
    SECURITY
 ======================= */
 
-// ✅ Helmet – allow file uploads
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
@@ -33,12 +32,22 @@ app.use(
   })
 );
 
-// ✅ CORS – frontend only
 app.use(
   cors({
-    origin: "https://hideshare.vercel.app",
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (
+        origin === "https://hideshare.vercel.app" ||
+        origin.endsWith(".vercel.app")
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(null, false);
+    },
     methods: ["GET", "POST"],
-    credentials: false,
+    credentials: true,
   })
 );
 
@@ -159,7 +168,8 @@ app.get("/download/:filename", downloadLimiter, async (req, res) => {
   }
 
   const filePath = path.join(__dirname, "uploads", file.filename);
-  if (!fs.existsSync(filePath)) return res.status(410).send("File missing");
+  if (!fs.existsSync(filePath))
+    return res.status(410).send("File missing");
 
   res.download(filePath, file.originalName, async () => {
     file.downloads += 1;
@@ -172,43 +182,48 @@ app.get("/download/:filename", downloadLimiter, async (req, res) => {
 });
 
 // ⬆ UPLOAD
-app.post("/upload", uploadLimiter, upload.single("file"), async (req, res) => {
-  if (!req.file)
-    return res.status(400).json({ error: "No file received" });
+app.post(
+  "/upload",
+  uploadLimiter,
+  upload.single("file"),
+  async (req, res) => {
+    if (!req.file)
+      return res.status(400).json({ error: "No file received" });
 
-  const password = req.body.password || null;
-  const expiry = req.body.expiry || "10m";
+    const password = req.body.password || null;
+    const expiry = req.body.expiry || "10m";
 
-  let maxDownloads = parseInt(req.body.maxDownloads || "1");
-  if (maxDownloads >= 9999) maxDownloads = null;
+    let maxDownloads = parseInt(req.body.maxDownloads || "1");
+    if (maxDownloads >= 9999) maxDownloads = null;
 
-  const hashedPassword = password
-    ? await bcrypt.hash(password, 10)
-    : null;
+    const hashedPassword = password
+      ? await bcrypt.hash(password, 10)
+      : null;
 
-  const expiresAt = EXPIRY_OPTIONS[expiry]
-    ? new Date(Date.now() + EXPIRY_OPTIONS[expiry])
-    : null;
+    const expiresAt = EXPIRY_OPTIONS[expiry]
+      ? new Date(Date.now() + EXPIRY_OPTIONS[expiry])
+      : null;
 
-  const file = new File({
-    originalName: req.file.originalname,
-    filename: req.file.filename,
-    size: req.file.size,
-    password: hashedPassword,
-    expiresAt,
-    maxDownloads,
-    downloads: 0,
-  });
+    const file = new File({
+      originalName: req.file.originalname,
+      filename: req.file.filename,
+      size: req.file.size,
+      password: hashedPassword,
+      expiresAt,
+      maxDownloads,
+      downloads: 0,
+    });
 
-  await file.save();
+    await file.save();
 
-  res.json({
-    message: "Upload successful",
-    downloadLink: `https://hideshare.vercel.app/download/${file.filename}`,
-    expiresAt,
-    maxDownloads,
-  });
-});
+    res.json({
+      message: "Upload successful",
+      downloadLink: `https://hideshare.vercel.app/download/${file.filename}`,
+      expiresAt,
+      maxDownloads,
+    });
+  }
+);
 
 /* =======================
    CLEANUP
