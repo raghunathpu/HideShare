@@ -16,6 +16,7 @@ function Upload() {
 
   /* 🌗 Load theme */
   useEffect(() => {
+    document.title = "HideShare – Secure File Sharing";
     const saved = localStorage.getItem("theme") || "light";
     document.documentElement.setAttribute("data-theme", saved);
   }, []);
@@ -116,7 +117,17 @@ function Upload() {
             : "Dark"}
         </button>
 
-        <h2>HideShare</h2>
+        <div style={{ textAlign: "center", marginBottom: "16px" }}>
+  <img
+    src="/logo.png"
+    alt="HideShare"
+    style={{ height: "48px", marginBottom: "6px" }}
+  />
+  <div style={{ color: "var(--muted)", fontSize: "14px" }}>
+    Secure file sharing made simple
+  </div>
+</div>
+
 
         <div
           className="drop-box"

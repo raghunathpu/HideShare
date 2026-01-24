@@ -84,9 +84,19 @@ body {
   width: auto;           /* IMPORTANT */
 }
 
-.theme-toggle:hover {
-  background: var(--border);
+.theme-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  z-index: 1000;
 }
+
 
 
 

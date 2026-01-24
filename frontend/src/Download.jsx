@@ -13,6 +13,7 @@ function Download() {
 
   /* 🌗 Theme */
   useEffect(() => {
+    document.title = "Download File – HideShare";
     const saved = localStorage.getItem("theme") || "light";
     document.documentElement.setAttribute("data-theme", saved);
   }, []);
@@ -100,7 +101,14 @@ function Download() {
             : "Dark"}
         </button>
 
-        <h2>Download File</h2>
+        <div style={{ textAlign: "center", marginBottom: "16px" }}>
+  <img
+    src="/logo.png"
+    alt="HideShare"
+    style={{ height: "40px" }}
+  />
+</div>
+
 
         <p><strong>File:</strong> {fileInfo.originalName}</p>
         <p><strong>Size:</strong> {(fileInfo.size / 1024).toFixed(2)} KB</p>
