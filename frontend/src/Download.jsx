@@ -33,7 +33,7 @@ function Download() {
 
   /* 📡 Metadata */
   useEffect(() => {
-    fetch(`https://hideshare-backend.onrender.com/meta/${filename}`)
+    fetch(`${import.meta.env.BACKEND}/meta/${filename}`)
       .then(async (res) => {
         if (!res.ok) throw new Error("File not found");
         return res.json();
@@ -65,7 +65,7 @@ function Download() {
   }, [expiryText, navigate]);
 
   const download = () => {
-  let url = `https://hideshare-backend.onrender.com/download/${filename}`;
+  let url = `${import.meta.env.BACKEND}/download/${filename}`;
   if (password) url += `?password=${encodeURIComponent(password)}`;
 
   // ONE request only → backend counter correct

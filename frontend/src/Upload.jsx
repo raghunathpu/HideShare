@@ -64,7 +64,7 @@ function Upload() {
 
     try {
       const res = await fetch(
-        "https://hideshare-backend.onrender.com/upload",
+        "http://localhost:5000/upload",
         { method: "POST", body: formData }
       );
 

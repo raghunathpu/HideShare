@@ -38,8 +38,7 @@ app.use(
       if (!origin) return callback(null, true);
 
       if (
-        origin === "https://hideshare.vercel.app" ||
-        origin.endsWith(".vercel.app")
+        origin === process.env.FRONTEND || origin === "http://localhost:5173"
       ) {
         return callback(null, true);
       }
@@ -227,7 +226,7 @@ app.post(
 
     res.json({
       message: "Upload successful",
-      downloadLink: `https://hideshare.vercel.app/download/${file.filename}`,
+      downloadLink: `http://localhost:5000/download/${file.filename}`,
       expiresAt,
       maxDownloads,
     });
