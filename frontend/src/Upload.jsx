@@ -64,7 +64,7 @@ function Upload() {
 
     try {
       const res = await fetch(
-        `${process.env.BACKEND}/upload`,
+        `${import.meta.env.BACKEND}/upload`,
         { method: "POST", body: formData }
       );
 
