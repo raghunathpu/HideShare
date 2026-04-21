@@ -38,7 +38,7 @@ app.use(
       if (!origin) return callback(null, true);
 
       if (
-        origin === process.env.FRONTEND || origin === "http://localhost:5173"
+        origin === process.env.FRONTEND 
       ) {
         return callback(null, true);
       }
@@ -226,7 +226,7 @@ app.post(
 
     res.json({
       message: "Upload successful",
-      downloadLink: `http://localhost:5000/download/${file.filename}`,
+      downloadLink: `${process.env.FRONTEND}/download/${file.filename}`,
       expiresAt,
       maxDownloads,
     });

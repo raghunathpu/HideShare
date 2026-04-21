@@ -64,7 +64,7 @@ function Upload() {
 
     try {
       const res = await fetch(
-        "http://localhost:5000/upload",
+        `${process.env.BACKEND}/upload`,
         { method: "POST", body: formData }
       );
 
