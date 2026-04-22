@@ -14,14 +14,13 @@ function Upload() {
 
   const qrRef = useRef(null);
 
-  /* 🌗 Load theme */
+  /* 🌗 Theme + Title */
   useEffect(() => {
     document.title = "HideShare – Secure File Sharing";
     const saved = localStorage.getItem("theme") || "light";
     document.documentElement.setAttribute("data-theme", saved);
   }, []);
 
-  /* 🌗 Toggle theme */
   const toggleTheme = () => {
     const current = document.documentElement.getAttribute("data-theme");
     const next = current === "dark" ? "light" : "dark";
@@ -45,16 +44,22 @@ function Upload() {
     return "FILE";
   };
 
-  /* ⬆ Upload */
-  const handleUpload = async () => {
+  /* ⬆ Upload (REAL PROGRESS) */
+  const handleUpload = () => {
     if (!file) {
       setStatus("Please select a file");
       return;
     }
 
+    // ✅ File size check (50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      setStatus("File too large (max 50MB)");
+      return;
+    }
+
     setUploading(true);
     setStatus("Uploading...");
-    setProgress(30);
+    setProgress(0);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -62,22 +67,35 @@ function Upload() {
     formData.append("expiry", expiry);
     formData.append("maxDownloads", maxDownloads);
 
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_BACKEND}/upload`,
-        { method: "POST", body: formData }
-      );
+    const xhr = new XMLHttpRequest();
 
-      setProgress(80);
-      const data = await res.json();
-      setUploadResult(data);
-      setProgress(100);
-      setStatus("");
-    } catch {
+    // 🔥 REAL upload progress
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const data = JSON.parse(xhr.responseText);
+        setUploadResult(data);
+        setStatus("");
+        setTimeout(() => setProgress(0), 2000);
+      } else {
+        setStatus("Upload failed");
+      }
+      setUploading(false);
+    };
+
+    xhr.onerror = () => {
       setStatus("Upload failed");
-    }
+      setUploading(false);
+    };
 
-    setUploading(false);
+    xhr.open("POST", "https://hideshare-backend.onrender.com/upload");
+    xhr.send(formData);
   };
 
   const copyLink = () => {
@@ -117,18 +135,19 @@ function Upload() {
             : "Dark"}
         </button>
 
+        {/* 🔥 Logo */}
         <div style={{ textAlign: "center", marginBottom: "16px" }}>
-  <img
-    src="/logo.png"
-    alt="HideShare"
-    style={{ height: "48px", marginBottom: "6px" }}
-  />
-  <div style={{ color: "var(--muted)", fontSize: "14px" }}>
-    Secure file sharing made simple
-  </div>
-</div>
+          <img
+            src="/logo.png"
+            alt="HideShare"
+            style={{ height: "48px", marginBottom: "6px" }}
+          />
+          <div style={{ color: "var(--muted)", fontSize: "14px" }}>
+            Secure file sharing made simple
+          </div>
+        </div>
 
-
+        {/* 📂 Drag Box */}
         <div
           className="drop-box"
           onDragOver={(e) => e.preventDefault()}
@@ -180,28 +199,41 @@ function Upload() {
           </select>
         </label>
 
-        <button onClick={handleUpload} disabled={uploading}>
+        <button onClick={handleUpload} disabled={uploading || !file}>
           {uploading ? "Uploading…" : "Upload"}
         </button>
 
+        {/* 📊 Progress */}
         {uploading && (
-          <div className="progress">
-            <div style={{ width: `${progress}%` }} />
-          </div>
+          <>
+            <div className="progress">
+              <div style={{ width: `${progress}%` }} />
+            </div>
+            <p style={{ textAlign: "center", fontSize: "13px" }}>
+              {progress}%
+            </p>
+          </>
         )}
 
         {status && <p className="warning">{status}</p>}
 
+        {/* ✅ Result */}
         {uploadResult && (
           <>
             <div className="divider" />
 
             <p className="success">Upload successful</p>
-            <p>Expires in: <strong>{expiryText}</strong></p>
+            <p>
+              Expires in: <strong>{expiryText}</strong>
+            </p>
 
             <button onClick={copyLink}>Copy Link</button>
 
-            <div ref={qrRef} className="qr-box" style={{ textAlign: "center" }}>
+            <div
+              ref={qrRef}
+              className="qr-box"
+              style={{ textAlign: "center" }}
+            >
               <p>Scan QR to download</p>
               <QRCodeCanvas
                 value={uploadResult.downloadLink}
